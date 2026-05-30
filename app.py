@@ -32,10 +32,6 @@ def export_to_excel(data):
         df.to_excel(writer, index=False, sheet_name='试剂清单')
     return output.getvalue()
 
-# 初始化确认状态
-if 'confirm_delete_reagent' not in st.session_state:
-    st.session_state.confirm_delete_reagent = {}
-
 menu = st.sidebar.radio("菜单", ["📋 试剂管理", "🔬 LCMS 送测", "⚛️ 核磁送测", "📎 导出Excel"])
 
 # ========== 试剂管理 ==========
@@ -169,19 +165,36 @@ if menu == "📋 试剂管理":
                     col_save, col_delete = st.columns(2)
                     with col_save:
                         if st.form_submit_button("💾 保存修改"):
-                            supabase.table('reagents').update({
-                                'name': new_name, 'cas': new_cas, 'location': new_location,
-                                'total': new_total, 'unit': new_unit,
-                                'danger_level': new_danger, 'storage_requirement': new_storage,
-                                'remark': new_remark
-                            }).eq('id', r['id']).execute()
-                            st.success("✅ 已保存")
-                            st.rerun()
+                            # 保存确认
+                            if 'confirm_save' not in st.session_state:
+                                st.session_state.confirm_save = False
+                            if not st.session_state.confirm_save:
+                                st.warning("⚠️ 请再次点击「保存修改」确认")
+                                if st.form_submit_button("⚠️ 确认保存"):
+                                    supabase.table('reagents').update({
+                                        'name': new_name, 'cas': new_cas, 'location': new_location,
+                                        'total': new_total, 'unit': new_unit,
+                                        'danger_level': new_danger, 'storage_requirement': new_storage,
+                                        'remark': new_remark
+                                    }).eq('id', r['id']).execute()
+                                    st.session_state.confirm_save = True
+                                    st.success("✅ 已保存")
+                                    st.rerun()
+                            else:
+                                st.session_state.confirm_save = False
                     with col_delete:
                         if st.form_submit_button("🗑️ 删除", type="primary"):
-                            supabase.table('reagents').delete().eq('id', r['id']).execute()
-                            st.success("✅ 已删除")
-                            st.rerun()
+                            if f'confirm_del_{r["id"]}' not in st.session_state:
+                                st.session_state[f'confirm_del_{r["id"]}'] = False
+                            if not st.session_state[f'confirm_del_{r["id"]}']:
+                                st.warning(f"⚠️ 请再次点击「删除」确认删除 {r['name']}")
+                                if st.form_submit_button("⚠️ 确认删除"):
+                                    supabase.table('reagents').delete().eq('id', r['id']).execute()
+                                    st.session_state[f'confirm_del_{r["id"]}'] = True
+                                    st.success("✅ 已删除")
+                                    st.rerun()
+                            else:
+                                st.session_state[f'confirm_del_{r["id"]}'] = False
         else:
             st.info("暂无数据")
 
@@ -227,14 +240,52 @@ elif menu == "🔬 LCMS 送测":
                     st.caption(f"提交人: {s['submitter']} | 时间: {s['submitted_at'][:16]}")
                     if s['notes']:
                         st.caption(f"备注: {s['notes']}")
+                
+                # 测完按钮（带确认）
                 with col3:
-                    if st.button(f"✅ 测完", key=f"lcms_{s['id']}"):
-                        supabase.table('lcms_samples').update({'status': 'completed'}).eq('id', s['id']).execute()
-                        st.rerun()
+                    if f'confirm_lcms_complete_{s["id"]}' not in st.session_state:
+                        st.session_state[f'confirm_lcms_complete_{s["id"]}'] = False
+                    
+                    if not st.session_state[f'confirm_lcms_complete_{s["id"]}']:
+                        if st.button(f"✅ 测完", key=f"lcms_complete_{s['id']}"):
+                            st.session_state[f'confirm_lcms_complete_{s["id"]}'] = True
+                            st.rerun()
+                    else:
+                        st.warning(f"确认 {s['sample_name']} 已测完？")
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            if st.button(f"确认", key=f"lcms_confirm_yes_{s['id']}"):
+                                supabase.table('lcms_samples').update({'status': 'completed'}).eq('id', s['id']).execute()
+                                st.session_state[f'confirm_lcms_complete_{s["id"]}'] = False
+                                st.success(f"✅ {s['sample_name']} 已完成")
+                                st.rerun()
+                        with col_b:
+                            if st.button(f"取消", key=f"lcms_confirm_no_{s['id']}"):
+                                st.session_state[f'confirm_lcms_complete_{s["id"]}'] = False
+                                st.rerun()
+                
+                # 删除按钮（带确认）
                 with col4:
-                    if st.button(f"🗑️ 删除", key=f"del_lcms_{s['id']}"):
-                        supabase.table('lcms_samples').delete().eq('id', s['id']).execute()
-                        st.rerun()
+                    if f'confirm_lcms_del_{s["id"]}' not in st.session_state:
+                        st.session_state[f'confirm_lcms_del_{s["id"]}'] = False
+                    
+                    if not st.session_state[f'confirm_lcms_del_{s["id"]}']:
+                        if st.button(f"🗑️ 删除", key=f"lcms_del_{s['id']}"):
+                            st.session_state[f'confirm_lcms_del_{s["id"]}'] = True
+                            st.rerun()
+                    else:
+                        st.warning(f"确认删除 {s['sample_name']}？")
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            if st.button(f"确认删除", key=f"lcms_del_yes_{s['id']}"):
+                                supabase.table('lcms_samples').delete().eq('id', s['id']).execute()
+                                st.session_state[f'confirm_lcms_del_{s["id"]}'] = False
+                                st.success(f"🗑️ 已删除 {s['sample_name']}")
+                                st.rerun()
+                        with col_b:
+                            if st.button(f"取消", key=f"lcms_del_no_{s['id']}"):
+                                st.session_state[f'confirm_lcms_del_{s["id"]}'] = False
+                                st.rerun()
                 st.divider()
 
 # ========== 核磁送测 ==========
@@ -291,14 +342,52 @@ elif menu == "⚛️ 核磁送测":
                     st.caption(f"提交人: {s['submitter']} | 时间: {s['submitted_at'][:16]}")
                     if s['notes']:
                         st.caption(f"备注: {s['notes']}")
+                
+                # 测完按钮（带确认）
                 with col3:
-                    if st.button(f"✅ 测完", key=f"nmr_{s['id']}"):
-                        supabase.table('nmr_samples').update({'status': 'completed'}).eq('id', s['id']).execute()
-                        st.rerun()
+                    if f'confirm_nmr_complete_{s["id"]}' not in st.session_state:
+                        st.session_state[f'confirm_nmr_complete_{s["id"]}'] = False
+                    
+                    if not st.session_state[f'confirm_nmr_complete_{s["id"]}']:
+                        if st.button(f"✅ 测完", key=f"nmr_complete_{s['id']}"):
+                            st.session_state[f'confirm_nmr_complete_{s["id"]}'] = True
+                            st.rerun()
+                    else:
+                        st.warning(f"确认 {s['sample_name']} 已测完？")
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            if st.button(f"确认", key=f"nmr_confirm_yes_{s['id']}"):
+                                supabase.table('nmr_samples').update({'status': 'completed'}).eq('id', s['id']).execute()
+                                st.session_state[f'confirm_nmr_complete_{s["id"]}'] = False
+                                st.success(f"✅ {s['sample_name']} 已完成")
+                                st.rerun()
+                        with col_b:
+                            if st.button(f"取消", key=f"nmr_confirm_no_{s['id']}"):
+                                st.session_state[f'confirm_nmr_complete_{s["id"]}'] = False
+                                st.rerun()
+                
+                # 删除按钮（带确认）
                 with col4:
-                    if st.button(f"🗑️ 删除", key=f"del_nmr_{s['id']}"):
-                        supabase.table('nmr_samples').delete().eq('id', s['id']).execute()
-                        st.rerun()
+                    if f'confirm_nmr_del_{s["id"]}' not in st.session_state:
+                        st.session_state[f'confirm_nmr_del_{s["id"]}'] = False
+                    
+                    if not st.session_state[f'confirm_nmr_del_{s["id"]}']:
+                        if st.button(f"🗑️ 删除", key=f"nmr_del_{s['id']}"):
+                            st.session_state[f'confirm_nmr_del_{s["id"]}'] = True
+                            st.rerun()
+                    else:
+                        st.warning(f"确认删除 {s['sample_name']}？")
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            if st.button(f"确认删除", key=f"nmr_del_yes_{s['id']}"):
+                                supabase.table('nmr_samples').delete().eq('id', s['id']).execute()
+                                st.session_state[f'confirm_nmr_del_{s["id"]}'] = False
+                                st.success(f"🗑️ 已删除 {s['sample_name']}")
+                                st.rerun()
+                        with col_b:
+                            if st.button(f"取消", key=f"nmr_del_no_{s['id']}"):
+                                st.session_state[f'confirm_nmr_del_{s["id"]}'] = False
+                                st.rerun()
                 st.divider()
 
 # ========== 导出Excel ==========
