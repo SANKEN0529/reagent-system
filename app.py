@@ -234,7 +234,7 @@ elif menu == "🔬 LCMS 送测":
                 else:
                     st.error("请填写姓名和样品名称")
     
-    with tab2:
+        with tab2:
         samples = supabase.table('lcms_samples').select('*').eq('status', 'pending').order('submitted_at').execute().data
         
         if not samples:
@@ -243,7 +243,7 @@ elif menu == "🔬 LCMS 送测":
             st.subheader(f"📊 待测数量：{len(samples)} 个样品")
             
             for s in samples:
-                col1, col2, col3 = st.columns([4, 1, 1])
+                col1, col2, col3, col4 = st.columns([4, 1, 1, 1])
                 with col1:
                     st.write(f"**{s['sample_name']}**")
                     st.caption(f"提交人: {s['submitter']} | 时间: {s['submitted_at'][:16]}")
@@ -258,17 +258,40 @@ elif menu == "🔬 LCMS 送测":
                             st.session_state[f'confirm_lcms_{s["id"]}'] = True
                             st.rerun()
                     else:
-                        st.warning(f"⚠️ 确认 {s['sample_name']} 已测完？")
+                        st.warning(f"确认 {s['sample_name']} 已测完？")
                         col_a, col_b = st.columns(2)
                         with col_a:
-                            if st.button(f"✅ 确认", key=f"confirm_lcms_yes_{s['id']}"):
+                            if st.button(f"确认", key=f"confirm_lcms_yes_{s['id']}"):
                                 supabase.table('lcms_samples').update({'status': 'completed'}).eq('id', s['id']).execute()
                                 st.session_state[f'confirm_lcms_{s["id"]}'] = False
                                 st.success(f"✅ {s['sample_name']} 已完成")
                                 st.rerun()
                         with col_b:
-                            if st.button(f"❌ 取消", key=f"confirm_lcms_no_{s['id']}"):
+                            if st.button(f"取消", key=f"confirm_lcms_no_{s['id']}"):
                                 st.session_state[f'confirm_lcms_{s["id"]}'] = False
+                                st.rerun()
+                
+                with col4:
+                    # 删除按钮
+                    if f'delete_lcms_{s["id"]}' not in st.session_state:
+                        st.session_state[f'delete_lcms_{s["id"]}'] = False
+                    
+                    if not st.session_state[f'delete_lcms_{s["id"]}']:
+                        if st.button(f"🗑️ 删除", key=f"del_lcms_{s['id']}"):
+                            st.session_state[f'delete_lcms_{s["id"]}'] = True
+                            st.rerun()
+                    else:
+                        st.warning(f"确认删除 {s['sample_name']}？")
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            if st.button(f"确认删除", key=f"del_lcms_yes_{s['id']}"):
+                                supabase.table('lcms_samples').delete().eq('id', s['id']).execute()
+                                st.session_state[f'delete_lcms_{s["id"]}'] = False
+                                st.success(f"🗑️ 已删除 {s['sample_name']}")
+                                st.rerun()
+                        with col_b:
+                            if st.button(f"取消", key=f"del_lcms_no_{s['id']}"):
+                                st.session_state[f'delete_lcms_{s["id"]}'] = False
                                 st.rerun()
                 st.divider()
 
@@ -303,7 +326,7 @@ elif menu == "⚛️ 核磁送测":
                 else:
                     st.error("请填写姓名和样品名称")
     
-    with tab2:
+        with tab2:
         samples = supabase.table('nmr_samples').select('*').eq('status', 'pending').order('submitted_at').execute().data
         
         if not samples:
@@ -319,7 +342,7 @@ elif menu == "⚛️ 核磁送测":
             st.divider()
             
             for s in samples:
-                col1, col2, col3 = st.columns([4, 1, 1])
+                col1, col2, col3, col4 = st.columns([4, 1, 1, 1])
                 with col1:
                     st.write(f"**{s['sample_name']}**")
                     st.caption(f"类型: {s['nmr_type']} | 溶剂: {s.get('solvent', '未指定')}")
@@ -335,20 +358,42 @@ elif menu == "⚛️ 核磁送测":
                             st.session_state[f'confirm_nmr_{s["id"]}'] = True
                             st.rerun()
                     else:
-                        st.warning(f"⚠️ 确认 {s['sample_name']} 已测完？")
+                        st.warning(f"确认 {s['sample_name']} 已测完？")
                         col_a, col_b = st.columns(2)
                         with col_a:
-                            if st.button(f"✅ 确认", key=f"confirm_nmr_yes_{s['id']}"):
+                            if st.button(f"确认", key=f"confirm_nmr_yes_{s['id']}"):
                                 supabase.table('nmr_samples').update({'status': 'completed'}).eq('id', s['id']).execute()
                                 st.session_state[f'confirm_nmr_{s["id"]}'] = False
                                 st.success(f"✅ {s['sample_name']} 已完成")
                                 st.rerun()
                         with col_b:
-                            if st.button(f"❌ 取消", key=f"confirm_nmr_no_{s['id']}"):
+                            if st.button(f"取消", key=f"confirm_nmr_no_{s['id']}"):
                                 st.session_state[f'confirm_nmr_{s["id"]}'] = False
                                 st.rerun()
+                
+                with col4:
+                    # 删除按钮
+                    if f'delete_nmr_{s["id"]}' not in st.session_state:
+                        st.session_state[f'delete_nmr_{s["id"]}'] = False
+                    
+                    if not st.session_state[f'delete_nmr_{s["id"]}']:
+                        if st.button(f"🗑️ 删除", key=f"del_nmr_{s['id']}"):
+                            st.session_state[f'delete_nmr_{s["id"]}'] = True
+                            st.rerun()
+                    else:
+                        st.warning(f"确认删除 {s['sample_name']}？")
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            if st.button(f"确认删除", key=f"del_nmr_yes_{s['id']}"):
+                                supabase.table('nmr_samples').delete().eq('id', s['id']).execute()
+                                st.session_state[f'delete_nmr_{s["id"]}'] = False
+                                st.success(f"🗑️ 已删除 {s['sample_name']}")
+                                st.rerun()
+                        with col_b:
+                            if st.button(f"取消", key=f"del_nmr_no_{s['id']}"):
+                                st.session_state[f'delete_nmr_{s["id"]}'] = False
+                                st.rerun()
                 st.divider()
-
 # ========== 导出Excel ==========
 elif menu == "📎 导出Excel":
     st.header("📎 导出试剂清单")
