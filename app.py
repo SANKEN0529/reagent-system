@@ -5,19 +5,28 @@ from datetime import datetime
 import io
 import base64
 
-# 从 secrets 读取密钥
+# ========== 管理员配置 ==========
+ADMIN_PASSWORD = "18110"
+
+# Supabase 配置
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 st.set_page_config(page_title="实验室管理系统", page_icon="🧪", layout="wide")
+
+# ========== 初始化状态 ==========
+if 'admin_logged_in' not in st.session_state:
+    st.session_state.admin_logged_in = False
+
 st.title("🧪 实验室综合管理系统")
 
-# 危险等级选项
-DANGER_LEVELS = ["无", "易燃", "腐蚀", "有毒", "易燃+有毒", "腐蚀+有毒", "易燃+腐蚀", "剧毒"]
+# ========== 主菜单 ==========
+menu = st.sidebar.radio("菜单", ["📋 试剂管理", "🔬 LCMS 送测", "⚛️ 核磁送测", "🛒 购买预约", "👑 管理员模式"])
 
-# 存放要求选项
+# ========== 危险等级和存放要求选项 ==========
+DANGER_LEVELS = ["无", "易燃", "腐蚀", "有毒", "易燃+有毒", "腐蚀+有毒", "易燃+腐蚀", "剧毒"]
 STORAGE_REQUIREMENTS = ["无特殊要求", "阴凉干燥", "避光保存", "通风柜", "冰箱冷藏", "冷冻保存", "防潮", "密封保存"]
 
 # 导出Excel函数
@@ -32,15 +41,14 @@ def export_to_excel(data):
         df.to_excel(writer, index=False, sheet_name='试剂清单')
     return output.getvalue()
 
-menu = st.sidebar.radio("菜单", ["📋 试剂管理", "🔬 LCMS 送测", "⚛️ 核磁送测", "🛒 购买预约", "📎 导出Excel"])
-
-# ========== 试剂管理 ==========
+# ============================================================
+# 1. 试剂管理
+# ============================================================
 if menu == "📋 试剂管理":
     st.header("📋 试剂管理")
     
     reagent_menu = st.radio("选择操作", ["查看所有", "添加试剂", "搜索试剂", "编辑/删除"], horizontal=True)
     
-    # 查看所有
     if reagent_menu == "查看所有":
         data = supabase.table('reagents').select('*').execute().data
         if data:
@@ -63,7 +71,6 @@ if menu == "📋 试剂管理":
         else:
             st.info("暂无数据")
     
-    # 添加试剂
     elif reagent_menu == "添加试剂":
         with st.form("add_form"):
             col1, col2, col3 = st.columns(3)
@@ -91,9 +98,8 @@ if menu == "📋 试剂管理":
                     st.success(f"✅ 已添加 {name}")
                     st.balloons()
                 else:
-                    st.error("请填写完整信息（名称、CAS号、位置、单位、总量）")
+                    st.error("请填写完整信息")
     
-    # 搜索试剂
     elif reagent_menu == "搜索试剂":
         search_type = st.radio("搜索方式", ["按名称", "按CAS号", "按位置", "按危险等级"], horizontal=True)
         keyword = st.text_input("请输入关键字")
@@ -114,41 +120,27 @@ if menu == "📋 试剂管理":
             else:
                 st.warning("未找到")
     
-      # 编辑/删除
     elif reagent_menu == "编辑/删除":
         data = supabase.table('reagents').select('*').execute().data
         if data:
-            search_term = st.text_input("输入试剂名称或CAS号进行搜索", placeholder="例如：乙醇 或 64-17-5")
+            search_term = st.text_input("输入试剂名称或CAS号进行搜索")
             
             filtered_data = data
             if search_term:
                 search_lower = search_term.lower()
-                filtered_data = [
-                    r for r in data 
-                    if search_lower in r['name'].lower() 
-                    or search_lower in (r['cas'] or "").lower()
-                ]
+                filtered_data = [r for r in data if search_lower in r['name'].lower() or search_lower in (r['cas'] or "").lower()]
             
             if not filtered_data:
                 st.warning("未找到匹配的试剂")
             else:
                 st.write(f"找到 {len(filtered_data)} 种试剂")
-                
-                options = {}
-                for r in filtered_data:
-                    label = f"[ID:{r['id']}] {r['name']}"
-                    if r.get('cas'):
-                        label += f" (CAS:{r['cas']})"
-                    label += f" - 库存:{r['total']}{r['unit']}"
-                    options[label] = r
-                
+                options = {f"[ID:{r['id']}] {r['name']}": r for r in filtered_data}
                 selected_label = st.selectbox("选择试剂", list(options.keys()))
                 r = options[selected_label]
                 
                 st.divider()
                 st.subheader(f"当前编辑：{r['name']}")
                 
-                # ========== 编辑表单 ==========
                 with st.form("edit_form"):
                     col1, col2, col3 = st.columns(3)
                     with col1:
@@ -173,30 +165,30 @@ if menu == "📋 试剂管理":
                         st.success("✅ 已保存")
                         st.rerun()
                 
-                # ========== 删除按钮（放在表单外面）==========
                 st.markdown("---")
                 if st.button("🗑️ 删除试剂", key=f"del_btn_{r['id']}", type="primary"):
                     st.session_state[f'delete_confirm_{r["id"]}'] = True
                 
-                # 确认删除弹窗
                 if st.session_state.get(f'delete_confirm_{r["id"]}', False):
-                    st.warning(f"⚠️ 确认要删除「{r['name']}」吗？此操作不可恢复！")
+                    st.warning(f"⚠️ 确认删除「{r['name']}」？")
                     col_cfm, col_cnl = st.columns(2)
                     with col_cfm:
-                        if st.button("✅ 确认删除", key=f"confirm_del_{r['id']}"):
+                        if st.button("✅ 确认删除"):
                             supabase.table('reagents').delete().eq('id', r['id']).execute()
                             st.session_state[f'delete_confirm_{r["id"]}'] = False
-                            st.success(f"✅ 已删除 {r['name']}")
+                            st.success("✅ 已删除")
                             st.rerun()
                     with col_cnl:
-                        if st.button("❌ 取消", key=f"cancel_del_{r['id']}"):
+                        if st.button("❌ 取消"):
                             st.session_state[f'delete_confirm_{r["id"]}'] = False
                             st.rerun()
         else:
             st.info("暂无数据")
 
-# ========== LCMS 送测 ==========
-elif menu == "🔬 LCMS 送测":
+# ============================================================
+# 2. LCMS 送测
+# ============================================================
+if menu == "🔬 LCMS 送测":
     st.header("🔬 LCMS 送测登记")
     
     tab1, tab2 = st.tabs(["📝 登记样品", "✅ 管理待测样品"])
@@ -226,43 +218,19 @@ elif menu == "🔬 LCMS 送测":
         samples = supabase.table('lcms_samples').select('*').eq('status', 'pending').order('submitted_at').execute().data
         
         if not samples:
-            st.info("暂无待测 LCMS 样品 🎉")
+            st.info("暂无待测样品 🎉")
         else:
             st.subheader(f"📊 待测数量：{len(samples)} 个样品")
             
             for s in samples:
-                col1, col2, col3, col4 = st.columns([4, 1, 1, 1])
+                col1, col2 = st.columns([4, 1])
                 with col1:
                     st.write(f"**{s['sample_name']}**")
                     st.caption(f"提交人: {s['submitter']} | 时间: {s['submitted_at'][:16]}")
                     if s['notes']:
                         st.caption(f"备注: {s['notes']}")
                 
-                # 测完按钮（带确认）
-                with col3:
-                    if f'confirm_lcms_complete_{s["id"]}' not in st.session_state:
-                        st.session_state[f'confirm_lcms_complete_{s["id"]}'] = False
-                    
-                    if not st.session_state[f'confirm_lcms_complete_{s["id"]}']:
-                        if st.button(f"✅ 测完", key=f"lcms_complete_{s['id']}"):
-                            st.session_state[f'confirm_lcms_complete_{s["id"]}'] = True
-                            st.rerun()
-                    else:
-                        st.warning(f"确认 {s['sample_name']} 已测完？")
-                        col_a, col_b = st.columns(2)
-                        with col_a:
-                            if st.button(f"确认", key=f"lcms_confirm_yes_{s['id']}"):
-                                supabase.table('lcms_samples').update({'status': 'completed'}).eq('id', s['id']).execute()
-                                st.session_state[f'confirm_lcms_complete_{s["id"]}'] = False
-                                st.success(f"✅ {s['sample_name']} 已完成")
-                                st.rerun()
-                        with col_b:
-                            if st.button(f"取消", key=f"lcms_confirm_no_{s['id']}"):
-                                st.session_state[f'confirm_lcms_complete_{s["id"]}'] = False
-                                st.rerun()
-                
-                # 删除按钮（带确认）
-                with col4:
+                with col2:
                     if f'confirm_lcms_del_{s["id"]}' not in st.session_state:
                         st.session_state[f'confirm_lcms_del_{s["id"]}'] = False
                     
@@ -274,10 +242,10 @@ elif menu == "🔬 LCMS 送测":
                         st.warning(f"确认删除 {s['sample_name']}？")
                         col_a, col_b = st.columns(2)
                         with col_a:
-                            if st.button(f"确认删除", key=f"lcms_del_yes_{s['id']}"):
+                            if st.button(f"确认", key=f"lcms_del_yes_{s['id']}"):
                                 supabase.table('lcms_samples').delete().eq('id', s['id']).execute()
                                 st.session_state[f'confirm_lcms_del_{s["id"]}'] = False
-                                st.success(f"🗑️ 已删除 {s['sample_name']}")
+                                st.success("🗑️ 已删除")
                                 st.rerun()
                         with col_b:
                             if st.button(f"取消", key=f"lcms_del_no_{s['id']}"):
@@ -285,7 +253,9 @@ elif menu == "🔬 LCMS 送测":
                                 st.rerun()
                 st.divider()
 
-# ========== 核磁送测 ==========
+# ============================================================
+# 3. 核磁送测
+# ============================================================
 elif menu == "⚛️ 核磁送测":
     st.header("⚛️ 核磁送测登记")
     
@@ -320,7 +290,7 @@ elif menu == "⚛️ 核磁送测":
         samples = supabase.table('nmr_samples').select('*').eq('status', 'pending').order('submitted_at').execute().data
         
         if not samples:
-            st.info("暂无待测核磁样品 🎉")
+            st.info("暂无待测样品 🎉")
         else:
             h_count = len([s for s in samples if '氢谱' in s['nmr_type']])
             c_count = len([s for s in samples if '碳谱' in s['nmr_type']])
@@ -328,11 +298,10 @@ elif menu == "⚛️ 核磁送测":
             col1, col2 = st.columns(2)
             col1.metric("氢谱", h_count)
             col2.metric("碳谱", c_count)
-            
             st.divider()
             
             for s in samples:
-                col1, col2, col3, col4 = st.columns([4, 1, 1, 1])
+                col1, col2 = st.columns([4, 1])
                 with col1:
                     st.write(f"**{s['sample_name']}**")
                     st.caption(f"类型: {s['nmr_type']} | 溶剂: {s.get('solvent', '未指定')}")
@@ -340,31 +309,7 @@ elif menu == "⚛️ 核磁送测":
                     if s['notes']:
                         st.caption(f"备注: {s['notes']}")
                 
-                # 测完按钮（带确认）
-                with col3:
-                    if f'confirm_nmr_complete_{s["id"]}' not in st.session_state:
-                        st.session_state[f'confirm_nmr_complete_{s["id"]}'] = False
-                    
-                    if not st.session_state[f'confirm_nmr_complete_{s["id"]}']:
-                        if st.button(f"✅ 测完", key=f"nmr_complete_{s['id']}"):
-                            st.session_state[f'confirm_nmr_complete_{s["id"]}'] = True
-                            st.rerun()
-                    else:
-                        st.warning(f"确认 {s['sample_name']} 已测完？")
-                        col_a, col_b = st.columns(2)
-                        with col_a:
-                            if st.button(f"确认", key=f"nmr_confirm_yes_{s['id']}"):
-                                supabase.table('nmr_samples').update({'status': 'completed'}).eq('id', s['id']).execute()
-                                st.session_state[f'confirm_nmr_complete_{s["id"]}'] = False
-                                st.success(f"✅ {s['sample_name']} 已完成")
-                                st.rerun()
-                        with col_b:
-                            if st.button(f"取消", key=f"nmr_confirm_no_{s['id']}"):
-                                st.session_state[f'confirm_nmr_complete_{s["id"]}'] = False
-                                st.rerun()
-                
-                # 删除按钮（带确认）
-                with col4:
+                with col2:
                     if f'confirm_nmr_del_{s["id"]}' not in st.session_state:
                         st.session_state[f'confirm_nmr_del_{s["id"]}'] = False
                     
@@ -376,10 +321,10 @@ elif menu == "⚛️ 核磁送测":
                         st.warning(f"确认删除 {s['sample_name']}？")
                         col_a, col_b = st.columns(2)
                         with col_a:
-                            if st.button(f"确认删除", key=f"nmr_del_yes_{s['id']}"):
+                            if st.button(f"确认", key=f"nmr_del_yes_{s['id']}"):
                                 supabase.table('nmr_samples').delete().eq('id', s['id']).execute()
                                 st.session_state[f'confirm_nmr_del_{s["id"]}'] = False
-                                st.success(f"🗑️ 已删除 {s['sample_name']}")
+                                st.success("🗑️ 已删除")
                                 st.rerun()
                         with col_b:
                             if st.button(f"取消", key=f"nmr_del_no_{s['id']}"):
@@ -387,59 +332,64 @@ elif menu == "⚛️ 核磁送测":
                                 st.rerun()
                 st.divider()
 
-# ========== 购买预约 ==========
+# ============================================================
+# 4. 购买预约（普通用户）
+# ============================================================
 elif menu == "🛒 购买预约":
     st.header("🛒 试剂购买预约")
     
-    tab1, tab2 = st.tabs(["📝 登记购买需求", "✅ 管理购买预约"])
+    tab1, tab2 = st.tabs(["📝 登记购买需求", "✅ 查看购买记录"])
     
-    # ========== 登记购买需求 ==========
     with tab1:
         with st.form("purchase_form"):
             col1, col2 = st.columns(2)
             with col1:
+                requester = st.text_input("申请人 *")
                 reagent_name = st.text_input("试剂名称 *")
                 cas = st.text_input("CAS号")
-                specification = st.text_input("规格", placeholder="例如：500ml, 分析纯")
-                supplier = st.text_input("商家名称 *")
+                specification = st.text_input("规格", placeholder="例如：500ml, 分析纯, 500g")
             with col2:
+                supplier = st.text_input("商家名称")
                 product_number = st.text_input("产品编号")
                 price = st.number_input("价格 (元)", min_value=0.0, step=10.0, format="%.2f")
-                requester = st.text_input("申请人 *")
                 notes = st.text_area("备注", placeholder="用途、紧急程度等")
             
             if st.form_submit_button("📤 提交购买预约"):
-                if reagent_name and supplier and requester:
+                if requester and reagent_name:
                     supabase.table('purchase_requests').insert({
+                        'requester': requester,
                         'reagent_name': reagent_name,
                         'cas': cas,
                         'specification': specification,
                         'supplier': supplier,
                         'product_number': product_number,
                         'price': price,
-                        'requester': requester,
-                        'notes': notes
+                        'notes': notes,
+                        'purchase_status': '无'
                     }).execute()
                     st.success(f"✅ 已提交购买预约：{reagent_name}")
                     st.balloons()
                 else:
-                    st.error("请填写试剂名称、商家和申请人")
+                    st.error("请填写申请人和试剂名称")
     
-    # ========== 管理购买预约 ==========
     with tab2:
-        st.subheader("📋 待购买清单")
+        st.subheader("📋 购买记录")
         
-        # 加载待购买请求
-        requests = supabase.table('purchase_requests').select('*').eq('status', 'pending').order('requested_at').execute().data
+        filter_status = st.radio("筛选状态", ["全部", "无", "已购买"], horizontal=True)
+        
+        if filter_status == "全部":
+            requests = supabase.table('purchase_requests').select('*').order('requested_at', desc=True).execute().data
+        else:
+            requests = supabase.table('purchase_requests').select('*').eq('purchase_status', filter_status).order('requested_at', desc=True).execute().data
         
         if not requests:
-            st.info("暂无购买预约 🎉")
+            st.info("暂无记录")
         else:
-            st.caption(f"共 {len(requests)} 条待购买申请")
+            st.caption(f"共 {len(requests)} 条")
             
             for req in requests:
                 with st.container():
-                    col1, col2, col3 = st.columns([4, 1, 1])
+                    col1, col2 = st.columns([4, 1])
                     
                     with col1:
                         st.write(f"**{req['reagent_name']}**")
@@ -453,68 +403,230 @@ elif menu == "🛒 购买预约":
                         if req.get('product_number'):
                             details.append(f"货号: {req['product_number']}")
                         if req.get('price'):
-                            details.append(f"价格: ¥{req['price']}")
+                            details.append(f"¥{req['price']}")
                         st.caption(" | ".join(details))
                         st.caption(f"申请人: {req['requester']} | 时间: {req['requested_at'][:16]}")
                         if req.get('notes'):
                             st.caption(f"备注: {req['notes']}")
                     
-                    # 删除按钮（带确认）
-                    with col3:
-                        if f'confirm_purchase_del_{req["id"]}' not in st.session_state:
-                            st.session_state[f'confirm_purchase_del_{req["id"]}'] = False
-                        
-                        if not st.session_state[f'confirm_purchase_del_{req["id"]}']:
-                            if st.button(f"🗑️ 删除", key=f"purchase_del_{req['id']}"):
-                                st.session_state[f'confirm_purchase_del_{req["id"]}'] = True
-                                st.rerun()
-                        else:
-                            st.warning(f"确认删除 {req['reagent_name']}？")
-                            col_a, col_b = st.columns(2)
-                            with col_a:
-                                if st.button(f"确认删除", key=f"purchase_del_yes_{req['id']}"):
-                                    supabase.table('purchase_requests').delete().eq('id', req['id']).execute()
-                                    st.session_state[f'confirm_purchase_del_{req["id"]}'] = False
-                                    st.success(f"🗑️ 已删除 {req['reagent_name']}")
-                                    st.rerun()
-                            with col_b:
-                                if st.button(f"取消", key=f"purchase_del_no_{req['id']}"):
-                                    st.session_state[f'confirm_purchase_del_{req["id"]}'] = False
-                                    st.rerun()
-                    
-                    # 标记已购买按钮（可选）
                     with col2:
-                        if f'confirm_purchase_buy_{req["id"]}' not in st.session_state:
-                            st.session_state[f'confirm_purchase_buy_{req["id"]}'] = False
-                        
-                        if not st.session_state[f'confirm_purchase_buy_{req["id"]}']:
-                            if st.button(f"✅ 已购买", key=f"purchase_buy_{req['id']}"):
-                                st.session_state[f'confirm_purchase_buy_{req["id"]}'] = True
-                                st.rerun()
-                        else:
-                            st.info(f"确认 {req['reagent_name']} 已购买？")
-                            col_a, col_b = st.columns(2)
-                            with col_a:
-                                if st.button(f"确认购买", key=f"purchase_buy_yes_{req['id']}"):
-                                    supabase.table('purchase_requests').update({'status': 'completed'}).eq('id', req['id']).execute()
-                                    st.session_state[f'confirm_purchase_buy_{req["id"]}'] = False
-                                    st.success(f"✅ {req['reagent_name']} 已标记为已购买")
-                                    st.rerun()
-                            with col_b:
-                                if st.button(f"取消", key=f"purchase_buy_no_{req['id']}"):
-                                    st.session_state[f'confirm_purchase_buy_{req["id"]}'] = False
-                                    st.rerun()
+                        status = req.get('purchase_status', '无')
+                        if status == "无":
+                            st.markdown("🟡 **状态: 无**")
+                        elif status == "已购买":
+                            st.markdown("🟢 **状态: 已购买**")
                     
                     st.divider()
+
+# ============================================================
+# 5. 管理员模式
+# ============================================================
+elif menu == "👑 管理员模式":
+    st.header("👑 管理员模式")
+    
+    if not st.session_state.admin_logged_in:
+        password = st.text_input("请输入管理员密码", type="password")
+        if st.button("登录"):
+            if password == ADMIN_PASSWORD:
+                st.session_state.admin_logged_in = True
+                st.rerun()
+            else:
+                st.error("密码错误")
+        st.stop()
+    
+    st.success("✅ 已登录管理员模式")
+    
+    admin_menu = st.radio("选择管理项目", ["LCMS 管理", "核磁管理", "购买预约管理"], horizontal=True)
+    
+    # LCMS 管理
+    if admin_menu == "LCMS 管理":
+        st.subheader("🔬 LCMS 所有记录")
+        
+        all_samples = supabase.table('lcms_samples').select('*').order('submitted_at', desc=True).execute().data
+        
+        if not all_samples:
+            st.info("暂无记录")
+        else:
+            st.caption(f"共 {len(all_samples)} 条记录")
+            
+            if st.button("⚠️ 一键删除全部 LCMS 记录", type="primary"):
+                st.session_state['confirm_delete_all_lcms'] = True
+            
+            if st.session_state.get('confirm_delete_all_lcms', False):
+                st.warning("⚠️ 确认删除所有 LCMS 记录？此操作不可恢复！")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("✅ 确认删除全部"):
+                        supabase.table('lcms_samples').delete().neq('id', 0).execute()
+                        st.session_state['confirm_delete_all_lcms'] = False
+                        st.success("已删除所有记录")
+                        st.rerun()
+                with col2:
+                    if st.button("❌ 取消"):
+                        st.session_state['confirm_delete_all_lcms'] = False
+                        st.rerun()
+            
+            st.divider()
+            
+            for s in all_samples:
+                col1, col2 = st.columns([4, 1])
+                with col1:
+                    st.write(f"**{s['sample_name']}**")
+                    st.caption(f"提交人: {s['submitter']} | 时间: {s['submitted_at'][:16]} | 状态: {s.get('status', 'pending')}")
+                    if s.get('notes'):
+                        st.caption(f"备注: {s['notes']}")
+                with col2:
+                    if st.button(f"🗑️ 删除", key=f"admin_lcms_del_{s['id']}"):
+                        supabase.table('lcms_samples').delete().eq('id', s['id']).execute()
+                        st.rerun()
+                st.divider()
+    
+    # 核磁管理
+    elif admin_menu == "核磁管理":
+        st.subheader("⚛️ 核磁所有记录")
+        
+        all_samples = supabase.table('nmr_samples').select('*').order('submitted_at', desc=True).execute().data
+        
+        if not all_samples:
+            st.info("暂无记录")
+        else:
+            st.caption(f"共 {len(all_samples)} 条记录")
+            
+            if st.button("⚠️ 一键删除全部 核磁 记录", type="primary"):
+                st.session_state['confirm_delete_all_nmr'] = True
+            
+            if st.session_state.get('confirm_delete_all_nmr', False):
+                st.warning("⚠️ 确认删除所有核磁记录？此操作不可恢复！")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("✅ 确认删除全部"):
+                        supabase.table('nmr_samples').delete().neq('id', 0).execute()
+                        st.session_state['confirm_delete_all_nmr'] = False
+                        st.success("已删除所有记录")
+                        st.rerun()
+                with col2:
+                    if st.button("❌ 取消"):
+                        st.session_state['confirm_delete_all_nmr'] = False
+                        st.rerun()
+            
+            st.divider()
+            
+            for s in all_samples:
+                col1, col2 = st.columns([4, 1])
+                with col1:
+                    st.write(f"**{s['sample_name']}**")
+                    st.caption(f"类型: {s['nmr_type']} | 溶剂: {s.get('solvent', '未指定')}")
+                    st.caption(f"提交人: {s['submitter']} | 时间: {s['submitted_at'][:16]} | 状态: {s.get('status', 'pending')}")
+                    if s.get('notes'):
+                        st.caption(f"备注: {s['notes']}")
+                with col2:
+                    if st.button(f"🗑️ 删除", key=f"admin_nmr_del_{s['id']}"):
+                        supabase.table('nmr_samples').delete().eq('id', s['id']).execute()
+                        st.rerun()
+                st.divider()
+    
+    # 购买预约管理
+    elif admin_menu == "购买预约管理":
+        st.subheader("🛒 购买预约所有记录")
+        
+        all_requests = supabase.table('purchase_requests').select('*').order('requested_at', desc=True).execute().data
+        
+        if not all_requests:
+            st.info("暂无记录")
+        else:
+            st.caption(f"共 {len(all_requests)} 条记录")
+            
+            for req in all_requests:
+                col1, col2, col3, col4 = st.columns([4, 1, 1, 1])
+                
+                with col1:
+                    st.write(f"**{req['reagent_name']}**")
+                    details = []
+                    if req.get('cas'):
+                        details.append(f"CAS: {req['cas']}")
+                    if req.get('specification'):
+                        details.append(f"规格: {req['specification']}")
+                    if req.get('supplier'):
+                        details.append(f"商家: {req['supplier']}")
+                    if req.get('product_number'):
+                        details.append(f"货号: {req['product_number']}")
+                    if req.get('price'):
+                        details.append(f"¥{req['price']}")
+                    st.caption(" | ".join(details))
+                    st.caption(f"申请人: {req['requester']} | 时间: {req['requested_at'][:16]}")
+                    if req.get('notes'):
+                        st.caption(f"备注: {req['notes']}")
+                
+                # 状态选择（无/已购买）
+                with col2:
+                    current_status = req.get('purchase_status', '无')
+                    new_status = st.selectbox(
+                        "状态",
+                        ["无", "已购买"],
+                        index=0 if current_status == "无" else 1,
+                        key=f"status_{req['id']}"
+                    )
+                    if new_status != current_status:
+                        supabase.table('purchase_requests').update({'purchase_status': new_status}).eq('id', req['id']).execute()
+                        st.rerun()
+                
+                # 已送达按钮（确认后删除）
+                with col3:
+                    if f'deliver_confirm_{req["id"]}' not in st.session_state:
+                        st.session_state[f'deliver_confirm_{req["id"]}'] = False
                     
-# ========== 导出Excel ==========
+                    if not st.session_state[f'deliver_confirm_{req["id"]}']:
+                        if st.button(f"📦 已送达", key=f"deliver_{req['id']}"):
+                            st.session_state[f'deliver_confirm_{req["id"]}'] = True
+                            st.rerun()
+                    else:
+                        st.warning(f"确认 {req['reagent_name']} 已送达？")
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            if st.button(f"✅ 确认", key=f"deliver_yes_{req['id']}"):
+                                supabase.table('purchase_requests').delete().eq('id', req['id']).execute()
+                                st.session_state[f'deliver_confirm_{req["id"]}'] = False
+                                st.success(f"📦 {req['reagent_name']} 已送达并删除")
+                                st.rerun()
+                        with col_b:
+                            if st.button(f"❌ 取消", key=f"deliver_no_{req['id']}"):
+                                st.session_state[f'deliver_confirm_{req["id"]}'] = False
+                                st.rerun()
+                
+                # 删除按钮（确认后删除）
+                with col4:
+                    if f'delete_confirm_{req["id"]}' not in st.session_state:
+                        st.session_state[f'delete_confirm_{req["id"]}'] = False
+                    
+                    if not st.session_state[f'delete_confirm_{req["id"]}']:
+                        if st.button(f"🗑️ 删除", key=f"admin_del_{req['id']}"):
+                            st.session_state[f'delete_confirm_{req["id"]}'] = True
+                            st.rerun()
+                    else:
+                        st.warning(f"确认删除 {req['reagent_name']}？")
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            if st.button(f"✅ 确认删除", key=f"admin_del_yes_{req['id']}"):
+                                supabase.table('purchase_requests').delete().eq('id', req['id']).execute()
+                                st.session_state[f'delete_confirm_{req["id"]}'] = False
+                                st.success(f"🗑️ 已删除 {req['reagent_name']}")
+                                st.rerun()
+                        with col_b:
+                            if st.button(f"❌ 取消", key=f"admin_del_no_{req['id']}"):
+                                st.session_state[f'delete_confirm_{req["id"]}'] = False
+                                st.rerun()
+                
+                st.divider()
+
+# ============================================================
+# 6. 导出Excel
+# ============================================================
 elif menu == "📎 导出Excel":
     st.header("📎 导出试剂清单")
     data = supabase.table('reagents').select('*').execute().data
     
     if data:
-        st.info(f"共 {len(data)} 种试剂，点击下方按钮导出Excel文件")
-        
+        st.info(f"共 {len(data)} 种试剂")
         st.subheader("预览（前5条）")
         st.dataframe(pd.DataFrame(data).head(5))
         
@@ -522,7 +634,6 @@ elif menu == "📎 导出Excel":
         b64 = base64.b64encode(excel_data).decode()
         href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="试剂清单_{datetime.now().strftime("%Y%m%d")}.xlsx">📥 点击下载Excel文件</a>'
         st.markdown(href, unsafe_allow_html=True)
-        
         st.success("导出完成！")
     else:
-        st.warning("暂无数据，请先添加试剂")
+        st.warning("暂无数据")
