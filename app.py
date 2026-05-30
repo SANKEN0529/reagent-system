@@ -475,13 +475,32 @@ elif menu == "👑 管理员模式":
                     st.caption(f"提交人: {s['submitter']} | 时间: {s['submitted_at'][:16]} | 状态: {s.get('status', 'pending')}")
                     if s.get('notes'):
                         st.caption(f"备注: {s['notes']}")
+                
+                # 删除按钮（带二次确认）
                 with col2:
-                    if st.button(f"🗑️ 删除", key=f"admin_lcms_del_{s['id']}"):
-                        supabase.table('lcms_samples').delete().eq('id', s['id']).execute()
-                        st.rerun()
+                    if f'admin_lcms_del_confirm_{s["id"]}' not in st.session_state:
+                        st.session_state[f'admin_lcms_del_confirm_{s["id"]}'] = False
+                    
+                    if not st.session_state[f'admin_lcms_del_confirm_{s["id"]}']:
+                        if st.button(f"🗑️ 删除", key=f"admin_lcms_del_{s['id']}"):
+                            st.session_state[f'admin_lcms_del_confirm_{s["id"]}'] = True
+                            st.rerun()
+                    else:
+                        st.warning(f"确认删除 {s['sample_name']}？")
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            if st.button(f"✅ 确认", key=f"admin_lcms_del_yes_{s['id']}"):
+                                supabase.table('lcms_samples').delete().eq('id', s['id']).execute()
+                                st.session_state[f'admin_lcms_del_confirm_{s["id"]}'] = False
+                                st.success(f"🗑️ 已删除 {s['sample_name']}")
+                                st.rerun()
+                        with col_b:
+                            if st.button(f"❌ 取消", key=f"admin_lcms_del_no_{s['id']}"):
+                                st.session_state[f'admin_lcms_del_confirm_{s["id"]}'] = False
+                                st.rerun()
                 st.divider()
     
-    # 核磁管理
+       # 核磁管理
     elif admin_menu == "核磁管理":
         st.subheader("⚛️ 核磁所有记录")
         
@@ -519,10 +538,29 @@ elif menu == "👑 管理员模式":
                     st.caption(f"提交人: {s['submitter']} | 时间: {s['submitted_at'][:16]} | 状态: {s.get('status', 'pending')}")
                     if s.get('notes'):
                         st.caption(f"备注: {s['notes']}")
+                
+                # 删除按钮（带二次确认）
                 with col2:
-                    if st.button(f"🗑️ 删除", key=f"admin_nmr_del_{s['id']}"):
-                        supabase.table('nmr_samples').delete().eq('id', s['id']).execute()
-                        st.rerun()
+                    if f'admin_nmr_del_confirm_{s["id"]}' not in st.session_state:
+                        st.session_state[f'admin_nmr_del_confirm_{s["id"]}'] = False
+                    
+                    if not st.session_state[f'admin_nmr_del_confirm_{s["id"]}']:
+                        if st.button(f"🗑️ 删除", key=f"admin_nmr_del_{s['id']}"):
+                            st.session_state[f'admin_nmr_del_confirm_{s["id"]}'] = True
+                            st.rerun()
+                    else:
+                        st.warning(f"确认删除 {s['sample_name']}？")
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            if st.button(f"✅ 确认", key=f"admin_nmr_del_yes_{s['id']}"):
+                                supabase.table('nmr_samples').delete().eq('id', s['id']).execute()
+                                st.session_state[f'admin_nmr_del_confirm_{s["id"]}'] = False
+                                st.success(f"🗑️ 已删除 {s['sample_name']}")
+                                st.rerun()
+                        with col_b:
+                            if st.button(f"❌ 取消", key=f"admin_nmr_del_no_{s['id']}"):
+                                st.session_state[f'admin_nmr_del_confirm_{s["id"]}'] = False
+                                st.rerun()
                 st.divider()
     
        # 购买预约管理
