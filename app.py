@@ -525,18 +525,49 @@ elif menu == "👑 管理员模式":
                         st.rerun()
                 st.divider()
     
-    # 购买预约管理
+       # 购买预约管理
     elif admin_menu == "购买预约管理":
         st.subheader("🛒 购买预约所有记录")
         
+        # 搜索框和筛选
+        col_search, col_filter = st.columns([3, 1])
+        with col_search:
+            search_keyword = st.text_input("🔍 搜索（试剂名称/CAS号/申请人/商家）", placeholder="输入关键字...", key="admin_purchase_search")
+        with col_filter:
+            filter_status = st.selectbox(
+                "筛选状态", 
+                ["全部", "无", "已购买"], 
+                key="admin_purchase_filter"
+            )
+        
+        # 加载所有数据
         all_requests = supabase.table('purchase_requests').select('*').order('requested_at', desc=True).execute().data
         
-        if not all_requests:
-            st.info("暂无记录")
+        # 应用筛选
+        filtered_requests = all_requests
+        if filter_status != "全部":
+            filtered_requests = [r for r in filtered_requests if r.get('purchase_status', '无') == filter_status]
+        
+        # 应用搜索
+        if search_keyword:
+            keyword_lower = search_keyword.lower()
+            filtered_requests = [
+                r for r in filtered_requests
+                if keyword_lower in r.get('reagent_name', '').lower()
+                or keyword_lower in r.get('cas', '').lower()
+                or keyword_lower in r.get('requester', '').lower()
+                or keyword_lower in r.get('supplier', '').lower()
+            ]
+        
+        if not filtered_requests:
+            if search_keyword:
+                st.info(f"未找到包含「{search_keyword}」的记录")
+            else:
+                st.info(f"暂无 {filter_status} 状态的记录" if filter_status != "全部" else "暂无记录")
         else:
-            st.caption(f"共 {len(all_requests)} 条记录")
+            st.caption(f"共 {len(filtered_requests)} 条记录")
             
-            for req in all_requests:
+            for req in filtered_requests:
                 col1, col2, col3, col4 = st.columns([4, 1, 1, 1])
                 
                 with col1:
@@ -564,7 +595,7 @@ elif menu == "👑 管理员模式":
                         "状态",
                         ["无", "已购买"],
                         index=0 if current_status == "无" else 1,
-                        key=f"status_{req['id']}"
+                        key=f"admin_status_{req['id']}"
                     )
                     if new_status != current_status:
                         supabase.table('purchase_requests').update({'purchase_status': new_status}).eq('id', req['id']).execute()
@@ -572,35 +603,35 @@ elif menu == "👑 管理员模式":
                 
                 # 已送达按钮（确认后删除）
                 with col3:
-                    if f'deliver_confirm_{req["id"]}' not in st.session_state:
-                        st.session_state[f'deliver_confirm_{req["id"]}'] = False
+                    if f'admin_deliver_confirm_{req["id"]}' not in st.session_state:
+                        st.session_state[f'admin_deliver_confirm_{req["id"]}'] = False
                     
-                    if not st.session_state[f'deliver_confirm_{req["id"]}']:
-                        if st.button(f"📦 已送达", key=f"deliver_{req['id']}"):
-                            st.session_state[f'deliver_confirm_{req["id"]}'] = True
+                    if not st.session_state[f'admin_deliver_confirm_{req["id"]}']:
+                        if st.button(f"📦 已送达", key=f"admin_deliver_{req['id']}"):
+                            st.session_state[f'admin_deliver_confirm_{req["id"]}'] = True
                             st.rerun()
                     else:
                         st.warning(f"确认 {req['reagent_name']} 已送达？")
                         col_a, col_b = st.columns(2)
                         with col_a:
-                            if st.button(f"✅ 确认", key=f"deliver_yes_{req['id']}"):
+                            if st.button(f"✅ 确认", key=f"admin_deliver_yes_{req['id']}"):
                                 supabase.table('purchase_requests').delete().eq('id', req['id']).execute()
-                                st.session_state[f'deliver_confirm_{req["id"]}'] = False
+                                st.session_state[f'admin_deliver_confirm_{req["id"]}'] = False
                                 st.success(f"📦 {req['reagent_name']} 已送达并删除")
                                 st.rerun()
                         with col_b:
-                            if st.button(f"❌ 取消", key=f"deliver_no_{req['id']}"):
-                                st.session_state[f'deliver_confirm_{req["id"]}'] = False
+                            if st.button(f"❌ 取消", key=f"admin_deliver_no_{req['id']}"):
+                                st.session_state[f'admin_deliver_confirm_{req["id"]}'] = False
                                 st.rerun()
                 
                 # 删除按钮（确认后删除）
                 with col4:
-                    if f'delete_confirm_{req["id"]}' not in st.session_state:
-                        st.session_state[f'delete_confirm_{req["id"]}'] = False
+                    if f'admin_delete_confirm_{req["id"]}' not in st.session_state:
+                        st.session_state[f'admin_delete_confirm_{req["id"]}'] = False
                     
-                    if not st.session_state[f'delete_confirm_{req["id"]}']:
+                    if not st.session_state[f'admin_delete_confirm_{req["id"]}']:
                         if st.button(f"🗑️ 删除", key=f"admin_del_{req['id']}"):
-                            st.session_state[f'delete_confirm_{req["id"]}'] = True
+                            st.session_state[f'admin_delete_confirm_{req["id"]}'] = True
                             st.rerun()
                     else:
                         st.warning(f"确认删除 {req['reagent_name']}？")
@@ -608,12 +639,12 @@ elif menu == "👑 管理员模式":
                         with col_a:
                             if st.button(f"✅ 确认删除", key=f"admin_del_yes_{req['id']}"):
                                 supabase.table('purchase_requests').delete().eq('id', req['id']).execute()
-                                st.session_state[f'delete_confirm_{req["id"]}'] = False
+                                st.session_state[f'admin_delete_confirm_{req["id"]}'] = False
                                 st.success(f"🗑️ 已删除 {req['reagent_name']}")
                                 st.rerun()
                         with col_b:
                             if st.button(f"❌ 取消", key=f"admin_del_no_{req['id']}"):
-                                st.session_state[f'delete_confirm_{req["id"]}'] = False
+                                st.session_state[f'admin_delete_confirm_{req["id"]}'] = False
                                 st.rerun()
                 
                 st.divider()
