@@ -387,6 +387,126 @@ elif menu == "⚛️ 核磁送测":
                                 st.rerun()
                 st.divider()
 
+# ========== 购买预约 ==========
+elif menu == "🛒 购买预约":
+    st.header("🛒 试剂购买预约")
+    
+    tab1, tab2 = st.tabs(["📝 登记购买需求", "✅ 管理购买预约"])
+    
+    # ========== 登记购买需求 ==========
+    with tab1:
+        with st.form("purchase_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                reagent_name = st.text_input("试剂名称 *")
+                cas = st.text_input("CAS号")
+                specification = st.text_input("规格", placeholder="例如：500ml, 分析纯")
+                supplier = st.text_input("商家名称 *")
+            with col2:
+                product_number = st.text_input("产品编号")
+                price = st.number_input("价格 (元)", min_value=0.0, step=10.0, format="%.2f")
+                requester = st.text_input("申请人 *")
+                notes = st.text_area("备注", placeholder="用途、紧急程度等")
+            
+            if st.form_submit_button("📤 提交购买预约"):
+                if reagent_name and supplier and requester:
+                    supabase.table('purchase_requests').insert({
+                        'reagent_name': reagent_name,
+                        'cas': cas,
+                        'specification': specification,
+                        'supplier': supplier,
+                        'product_number': product_number,
+                        'price': price,
+                        'requester': requester,
+                        'notes': notes
+                    }).execute()
+                    st.success(f"✅ 已提交购买预约：{reagent_name}")
+                    st.balloons()
+                else:
+                    st.error("请填写试剂名称、商家和申请人")
+    
+    # ========== 管理购买预约 ==========
+    with tab2:
+        st.subheader("📋 待购买清单")
+        
+        # 加载待购买请求
+        requests = supabase.table('purchase_requests').select('*').eq('status', 'pending').order('requested_at').execute().data
+        
+        if not requests:
+            st.info("暂无购买预约 🎉")
+        else:
+            st.caption(f"共 {len(requests)} 条待购买申请")
+            
+            for req in requests:
+                with st.container():
+                    col1, col2, col3 = st.columns([4, 1, 1])
+                    
+                    with col1:
+                        st.write(f"**{req['reagent_name']}**")
+                        details = []
+                        if req.get('cas'):
+                            details.append(f"CAS: {req['cas']}")
+                        if req.get('specification'):
+                            details.append(f"规格: {req['specification']}")
+                        if req.get('supplier'):
+                            details.append(f"商家: {req['supplier']}")
+                        if req.get('product_number'):
+                            details.append(f"货号: {req['product_number']}")
+                        if req.get('price'):
+                            details.append(f"价格: ¥{req['price']}")
+                        st.caption(" | ".join(details))
+                        st.caption(f"申请人: {req['requester']} | 时间: {req['requested_at'][:16]}")
+                        if req.get('notes'):
+                            st.caption(f"备注: {req['notes']}")
+                    
+                    # 删除按钮（带确认）
+                    with col3:
+                        if f'confirm_purchase_del_{req["id"]}' not in st.session_state:
+                            st.session_state[f'confirm_purchase_del_{req["id"]}'] = False
+                        
+                        if not st.session_state[f'confirm_purchase_del_{req["id"]}']:
+                            if st.button(f"🗑️ 删除", key=f"purchase_del_{req['id']}"):
+                                st.session_state[f'confirm_purchase_del_{req["id"]}'] = True
+                                st.rerun()
+                        else:
+                            st.warning(f"确认删除 {req['reagent_name']}？")
+                            col_a, col_b = st.columns(2)
+                            with col_a:
+                                if st.button(f"确认删除", key=f"purchase_del_yes_{req['id']}"):
+                                    supabase.table('purchase_requests').delete().eq('id', req['id']).execute()
+                                    st.session_state[f'confirm_purchase_del_{req["id"]}'] = False
+                                    st.success(f"🗑️ 已删除 {req['reagent_name']}")
+                                    st.rerun()
+                            with col_b:
+                                if st.button(f"取消", key=f"purchase_del_no_{req['id']}"):
+                                    st.session_state[f'confirm_purchase_del_{req["id"]}'] = False
+                                    st.rerun()
+                    
+                    # 标记已购买按钮（可选）
+                    with col2:
+                        if f'confirm_purchase_buy_{req["id"]}' not in st.session_state:
+                            st.session_state[f'confirm_purchase_buy_{req["id"]}'] = False
+                        
+                        if not st.session_state[f'confirm_purchase_buy_{req["id"]}']:
+                            if st.button(f"✅ 已购买", key=f"purchase_buy_{req['id']}"):
+                                st.session_state[f'confirm_purchase_buy_{req["id"]}'] = True
+                                st.rerun()
+                        else:
+                            st.info(f"确认 {req['reagent_name']} 已购买？")
+                            col_a, col_b = st.columns(2)
+                            with col_a:
+                                if st.button(f"确认购买", key=f"purchase_buy_yes_{req['id']}"):
+                                    supabase.table('purchase_requests').update({'status': 'completed'}).eq('id', req['id']).execute()
+                                    st.session_state[f'confirm_purchase_buy_{req["id"]}'] = False
+                                    st.success(f"✅ {req['reagent_name']} 已标记为已购买")
+                                    st.rerun()
+                            with col_b:
+                                if st.button(f"取消", key=f"purchase_buy_no_{req['id']}"):
+                                    st.session_state[f'confirm_purchase_buy_{req["id"]}'] = False
+                                    st.rerun()
+                    
+                    st.divider()
+                    
 # ========== 导出Excel ==========
 elif menu == "📎 导出Excel":
     st.header("📎 导出试剂清单")
