@@ -114,7 +114,7 @@ if menu == "📋 试剂管理":
             else:
                 st.warning("未找到")
     
-    # 编辑/删除
+      # 编辑/删除
     elif reagent_menu == "编辑/删除":
         data = supabase.table('reagents').select('*').execute().data
         if data:
@@ -148,6 +148,7 @@ if menu == "📋 试剂管理":
                 st.divider()
                 st.subheader(f"当前编辑：{r['name']}")
                 
+                # ========== 编辑表单 ==========
                 with st.form("edit_form"):
                     col1, col2, col3 = st.columns(3)
                     with col1:
@@ -162,39 +163,35 @@ if menu == "📋 试剂管理":
                         new_storage = st.selectbox("存放要求", STORAGE_REQUIREMENTS, index=STORAGE_REQUIREMENTS.index(r.get('storage_requirement', '无特殊要求')) if r.get('storage_requirement') in STORAGE_REQUIREMENTS else 0)
                         new_remark = st.text_area("备注", r['remark'] or "")
                     
-                    col_save, col_delete = st.columns(2)
-                    with col_save:
-                        if st.form_submit_button("💾 保存修改"):
-                            # 保存确认
-                            if 'confirm_save' not in st.session_state:
-                                st.session_state.confirm_save = False
-                            if not st.session_state.confirm_save:
-                                st.warning("⚠️ 请再次点击「保存修改」确认")
-                                if st.form_submit_button("⚠️ 确认保存"):
-                                    supabase.table('reagents').update({
-                                        'name': new_name, 'cas': new_cas, 'location': new_location,
-                                        'total': new_total, 'unit': new_unit,
-                                        'danger_level': new_danger, 'storage_requirement': new_storage,
-                                        'remark': new_remark
-                                    }).eq('id', r['id']).execute()
-                                    st.session_state.confirm_save = True
-                                    st.success("✅ 已保存")
-                                    st.rerun()
-                            else:
-                                st.session_state.confirm_save = False
-                    with col_delete:
-                        if st.form_submit_button("🗑️ 删除", type="primary"):
-                            if f'confirm_del_{r["id"]}' not in st.session_state:
-                                st.session_state[f'confirm_del_{r["id"]}'] = False
-                            if not st.session_state[f'confirm_del_{r["id"]}']:
-                                st.warning(f"⚠️ 请再次点击「删除」确认删除 {r['name']}")
-                                if st.form_submit_button("⚠️ 确认删除"):
-                                    supabase.table('reagents').delete().eq('id', r['id']).execute()
-                                    st.session_state[f'confirm_del_{r["id"]}'] = True
-                                    st.success("✅ 已删除")
-                                    st.rerun()
-                            else:
-                                st.session_state[f'confirm_del_{r["id"]}'] = False
+                    if st.form_submit_button("💾 保存修改"):
+                        supabase.table('reagents').update({
+                            'name': new_name, 'cas': new_cas, 'location': new_location,
+                            'total': new_total, 'unit': new_unit,
+                            'danger_level': new_danger, 'storage_requirement': new_storage,
+                            'remark': new_remark
+                        }).eq('id', r['id']).execute()
+                        st.success("✅ 已保存")
+                        st.rerun()
+                
+                # ========== 删除按钮（放在表单外面）==========
+                st.markdown("---")
+                if st.button("🗑️ 删除试剂", key=f"del_btn_{r['id']}", type="primary"):
+                    st.session_state[f'delete_confirm_{r["id"]}'] = True
+                
+                # 确认删除弹窗
+                if st.session_state.get(f'delete_confirm_{r["id"]}', False):
+                    st.warning(f"⚠️ 确认要删除「{r['name']}」吗？此操作不可恢复！")
+                    col_cfm, col_cnl = st.columns(2)
+                    with col_cfm:
+                        if st.button("✅ 确认删除", key=f"confirm_del_{r['id']}"):
+                            supabase.table('reagents').delete().eq('id', r['id']).execute()
+                            st.session_state[f'delete_confirm_{r["id"]}'] = False
+                            st.success(f"✅ 已删除 {r['name']}")
+                            st.rerun()
+                    with col_cnl:
+                        if st.button("❌ 取消", key=f"cancel_del_{r['id']}"):
+                            st.session_state[f'delete_confirm_{r["id"]}'] = False
+                            st.rerun()
         else:
             st.info("暂无数据")
 
