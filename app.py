@@ -119,40 +119,73 @@ elif menu == "编辑/删除":
     st.header("✏️ 编辑或删除试剂")
     data = supabase.table('reagents').select('*').execute().data
     if data:
-        options = {f"[{d['id']}] {d['name']}": d for d in data}
-        selected = st.selectbox("选择试剂", list(options.keys()))
-        r = options[selected]
+        # 创建搜索框
+        st.subheader("🔍 选择要操作的试剂")
         
-        with st.form("edit_form"):
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                new_name = st.text_input("名称", r['name'])
-                new_cas = st.text_input("CAS号", r['cas'] or "")
-                new_location = st.text_input("位置", r['location'])
-            with col2:
-                new_total = st.number_input("总量", value=int(r['total']), step=1)
-                new_unit = st.text_input("单位", r['unit'])
-                new_danger = st.selectbox("危险等级", DANGER_LEVELS, index=DANGER_LEVELS.index(r.get('danger_level', '无')) if r.get('danger_level') in DANGER_LEVELS else 0)
-            with col3:
-                new_storage = st.selectbox("存放要求", STORAGE_REQUIREMENTS, index=STORAGE_REQUIREMENTS.index(r.get('storage_requirement', '无特殊要求')) if r.get('storage_requirement') in STORAGE_REQUIREMENTS else 0)
-                new_remark = st.text_area("备注", r['remark'] or "")
+        # 搜索关键字输入
+        search_term = st.text_input("输入试剂名称或CAS号进行搜索", placeholder="例如：乙醇 或 64-17-5")
+        
+        # 根据搜索过滤结果
+        filtered_data = data
+        if search_term:
+            search_lower = search_term.lower()
+            filtered_data = [
+                r for r in data 
+                if search_lower in r['name'].lower() 
+                or search_lower in (r['cas'] or "").lower()
+            ]
+        
+        if not filtered_data:
+            st.warning("未找到匹配的试剂")
+        else:
+            # 显示搜索结果列表，让用户选择
+            st.write(f"找到 {len(filtered_data)} 种试剂")
             
-            col_save, col_delete = st.columns(2)
-            with col_save:
-                if st.form_submit_button("💾 保存修改"):
-                    supabase.table('reagents').update({
-                        'name': new_name, 'cas': new_cas, 'location': new_location,
-                        'total': new_total, 'unit': new_unit,
-                        'danger_level': new_danger, 'storage_requirement': new_storage,
-                        'remark': new_remark
-                    }).eq('id', r['id']).execute()
-                    st.success("✅ 已保存")
-                    st.rerun()
-            with col_delete:
-                if st.form_submit_button("🗑️ 删除", type="primary"):
-                    supabase.table('reagents').delete().eq('id', r['id']).execute()
-                    st.success("✅ 已删除")
-                    st.rerun()
+            # 创建选项标签
+            options = {}
+            for r in filtered_data:
+                label = f"[ID:{r['id']}] {r['name']}"
+                if r.get('cas'):
+                    label += f" (CAS:{r['cas']})"
+                label += f" - 库存:{r['total']}{r['unit']}"
+                options[label] = r
+            
+            selected_label = st.selectbox("选择试剂", list(options.keys()))
+            r = options[selected_label]
+            
+            st.divider()
+            st.subheader(f"当前编辑：{r['name']}")
+            
+            with st.form("edit_form"):
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    new_name = st.text_input("名称", r['name'])
+                    new_cas = st.text_input("CAS号", r['cas'] or "")
+                    new_location = st.text_input("位置", r['location'])
+                with col2:
+                    new_total = st.number_input("总量", value=int(r['total']), step=1)
+                    new_unit = st.text_input("单位", r['unit'])
+                    new_danger = st.selectbox("危险等级", DANGER_LEVELS, index=DANGER_LEVELS.index(r.get('danger_level', '无')) if r.get('danger_level') in DANGER_LEVELS else 0)
+                with col3:
+                    new_storage = st.selectbox("存放要求", STORAGE_REQUIREMENTS, index=STORAGE_REQUIREMENTS.index(r.get('storage_requirement', '无特殊要求')) if r.get('storage_requirement') in STORAGE_REQUIREMENTS else 0)
+                    new_remark = st.text_area("备注", r['remark'] or "")
+                
+                col_save, col_delete = st.columns(2)
+                with col_save:
+                    if st.form_submit_button("💾 保存修改"):
+                        supabase.table('reagents').update({
+                            'name': new_name, 'cas': new_cas, 'location': new_location,
+                            'total': new_total, 'unit': new_unit,
+                            'danger_level': new_danger, 'storage_requirement': new_storage,
+                            'remark': new_remark
+                        }).eq('id', r['id']).execute()
+                        st.success("✅ 已保存")
+                        st.rerun()
+                with col_delete:
+                    if st.form_submit_button("🗑️ 删除", type="primary"):
+                        supabase.table('reagents').delete().eq('id', r['id']).execute()
+                        st.success("✅ 已删除")
+                        st.rerun()
     else:
         st.info("暂无数据")
 
