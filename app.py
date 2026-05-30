@@ -32,7 +32,7 @@ def export_to_excel(data):
         df.to_excel(writer, index=False, sheet_name='试剂清单')
     return output.getvalue()
 
-menu = st.sidebar.radio("菜单", ["📋 试剂管理", "🔬 LCMS 送测", "⚛️ 核磁送测", "📎 导出Excel"])
+menu = st.sidebar.radio("菜单", ["📋 试剂管理", "🔬 LCMS 送测", "⚛️ 核磁送测", "🛒 购买预约", "📎 导出Excel"])
 
 # ========== 试剂管理 ==========
 if menu == "📋 试剂管理":
