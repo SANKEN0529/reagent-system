@@ -29,12 +29,12 @@ menu = st.sidebar.radio("菜单", ["📋 试剂管理", "🔬 LCMS 送测", "⚛
 DANGER_LEVELS = ["无", "易燃", "腐蚀", "有毒", "易燃+有毒", "腐蚀+有毒", "易燃+腐蚀", "剧毒"]
 STORAGE_REQUIREMENTS = ["无特殊要求", "阴凉干燥", "避光保存", "通风柜", "冰箱冷藏", "冷冻保存", "防潮", "密封保存"]
 
-# 导出Excel函数
+# 导出Excel函数（已隐藏ID）
 def export_to_excel(data):
     df = pd.DataFrame(data)
-    export_cols = ['id', 'name', 'cas', 'location', 'total', 'unit', 'date', 'danger_level', 'storage_requirement', 'remark']
+    export_cols = ['name', 'cas', 'location', 'total', 'unit', 'date', 'danger_level', 'storage_requirement', 'remark']
     df = df[export_cols]
-    df.columns = ['ID', '名称', 'CAS号', '位置', '总量', '单位', '登入日期', '危险等级', '存放要求', '备注']
+    df.columns = ['名称', 'CAS号', '位置', '总量', '单位', '登入日期', '危险等级', '存放要求', '备注']
     
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -49,11 +49,15 @@ if menu == "📋 试剂管理":
     
     reagent_menu = st.radio("选择操作", ["查看所有", "添加试剂", "搜索试剂", "编辑/删除"], horizontal=True)
     
+    # 查看所有（已隐藏ID）
     if reagent_menu == "查看所有":
         data = supabase.table('reagents').select('*').execute().data
         if data:
             df = pd.DataFrame(data)
-            st.dataframe(df, use_container_width=True)
+            display_cols = ['name', 'cas', 'location', 'total', 'unit', 'date', 'danger_level', 'storage_requirement', 'remark']
+            df_display = df[display_cols]
+            df_display.columns = ['名称', 'CAS号', '位置', '总量', '单位', '登入日期', '危险等级', '存放要求', '备注']
+            st.dataframe(df_display, use_container_width=True)
             st.caption(f"共 {len(data)} 种试剂")
             
             st.subheader("📊 统计信息")
@@ -100,6 +104,7 @@ if menu == "📋 试剂管理":
                 else:
                     st.error("请填写完整信息")
     
+    # 搜索试剂（已隐藏ID）
     elif reagent_menu == "搜索试剂":
         search_type = st.radio("搜索方式", ["按名称", "按CAS号", "按位置", "按危险等级"], horizontal=True)
         keyword = st.text_input("请输入关键字")
@@ -116,7 +121,11 @@ if menu == "📋 试剂管理":
             
             if data:
                 st.success(f"找到 {len(data)} 条结果")
-                st.dataframe(pd.DataFrame(data))
+                df_result = pd.DataFrame(data)
+                display_cols = ['name', 'cas', 'location', 'total', 'unit', 'date', 'danger_level', 'storage_requirement', 'remark']
+                df_display = df_result[display_cols]
+                df_display.columns = ['名称', 'CAS号', '位置', '总量', '单位', '登入日期', '危险等级', '存放要求', '备注']
+                st.dataframe(df_display)
             else:
                 st.warning("未找到")
     
