@@ -372,7 +372,7 @@ elif menu == "🛒 购买预约":
                 else:
                     st.error("请填写申请人和试剂名称")
     
-           with tab2:
+     with tab2:
         st.subheader("📋 购买记录")
         
         # 筛选状态
