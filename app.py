@@ -895,3 +895,41 @@ elif menu == "👑 管理员模式":
                 except Exception as e:
                     st.error(f"读取文件失败：{e}")
                     st.write("请点击「下载导入模板」按钮，使用生成的模板文件填写数据")
+    # ========== 系统设置 ==========
+    elif admin_menu == "系统设置":
+        st.subheader("系统设置")
+        
+        st.warning("⚠️ 以下操作不可恢复，请谨慎使用！")
+        
+        # 清空试剂数据
+        with st.expander("🗑️ 清空试剂数据"):
+            st.write("此操作将删除 **所有试剂数据**，不可恢复！")
+            
+            # 获取当前试剂数量
+            reagent_count = len(supabase.table('reagents').select('*', count='exact').execute().data)
+            st.write(f"当前共有 **{reagent_count}** 条试剂记录")
+            
+            if reagent_count > 0:
+                # 确认删除
+                if 'confirm_clear_reagents' not in st.session_state:
+                    st.session_state.confirm_clear_reagents = False
+                
+                if not st.session_state.confirm_clear_reagents:
+                    if st.button("🗑️ 清空所有试剂数据", type="primary"):
+                        st.session_state.confirm_clear_reagents = True
+                        st.rerun()
+                else:
+                    st.warning("⚠️ 确认要清空所有试剂数据吗？此操作不可恢复！")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("✅ 确认清空"):
+                            supabase.table('reagents').delete().neq('id', 0).execute()
+                            st.session_state.confirm_clear_reagents = False
+                            st.success("✅ 已清空所有试剂数据")
+                            st.rerun()
+                    with col2:
+                        if st.button("❌ 取消"):
+                            st.session_state.confirm_clear_reagents = False
+                            st.rerun()
+            else:
+                st.info("暂无数据")
