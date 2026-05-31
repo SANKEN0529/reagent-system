@@ -469,7 +469,7 @@ elif menu == "👑 管理员模式":
     
     st.success("✅ 已登录管理员模式")
     
-    admin_menu = st.radio("选择管理项目", ["LCMS 管理", "核磁管理", "购买预约管理", "数据导入导出"], horizontal=True)
+    admin_menu = st.radio("选择管理项目", ["LCMS 管理", "核磁管理", "购买预约管理", "数据导入导出", "系统设置"], horizontal=True)
     
     # LCMS 管理
     if admin_menu == "LCMS 管理":
@@ -720,7 +720,7 @@ elif menu == "👑 管理员模式":
                 
                 st.divider()
                 
-       # 数据导入导出
+           # 数据导入导出
     elif admin_menu == "数据导入导出":
         st.subheader("📊 数据导入导出")
         
@@ -735,13 +735,11 @@ elif menu == "👑 管理员模式":
             if data:
                 st.info(f"共 {len(data)} 种试剂")
                 
-                # 导出为 Excel（不包含 ID）
                 df = pd.DataFrame(data)
                 export_cols = ['name', 'cas', 'location', 'total', 'unit', 'date', 'danger_level', 'storage_requirement', 'remark']
                 df = df[export_cols]
                 df.columns = ['名称', 'CAS号', '位置', '总量', '单位', '登入日期', '危险等级', '存放要求', '备注']
                 
-                # 确保总量是整数格式
                 df['总量'] = df['总量'].apply(lambda x: int(x) if float(x).is_integer() else x)
                 
                 output = io.BytesIO()
@@ -754,25 +752,22 @@ elif menu == "👑 管理员模式":
                 st.markdown(href, unsafe_allow_html=True)
                 
                 st.success("导出完成！")
-                
-                # 预览
                 st.subheader("预览（前5条）")
                 st.dataframe(df.head(5))
             else:
                 st.warning("暂无数据")
         
-           # ========== 导入数据 ==========
+        # ========== 导入数据 ==========
         with tab_import:
             st.write("### 导入试剂清单")
             st.info("📌 导入说明：\n"
                     "- **必填列**：名称、位置、总量、单位\n"
                     "- **选填列**：CAS号、登入日期、危险等级、存放要求、备注\n"
-                    "- 系统会检查与已有数据完全一致的记录，并提示您选择处理方式\n"
-                    "- 请使用「导出数据」功能生成的模板文件")
+                    "- 缺少选填列时会自动填入默认值\n"
+                    "- 请使用「导出数据」功能生成的模板文件\n"
+                    "- 如果导入失败，请先用导出功能生成新模板")
             
-            # 提供模板下载
             if st.button("📥 下载导入模板"):
-                # 创建空模板
                 template_df = pd.DataFrame({
                     '名称': ['示例试剂'],
                     'CAS号': ['64-17-5'],
@@ -796,12 +791,10 @@ elif menu == "👑 管理员模式":
             
             if uploaded_file is not None:
                 try:
-                    # 强制以字符串类型读取所有列
                     df_import = pd.read_excel(uploaded_file, dtype=str)
                     st.write(f"读取到 {len(df_import)} 条记录")
                     st.dataframe(df_import.head())
                     
-                    # 检查必要的列
                     required_cols = ['名称', '位置', '总量', '单位']
                     missing_cols = [col for col in required_cols if col not in df_import.columns]
                     
@@ -809,143 +802,17 @@ elif menu == "👑 管理员模式":
                         st.error(f"缺少必要的列：{', '.join(missing_cols)}")
                         st.write("当前文件的列名：", list(df_import.columns))
                     else:
-                        # 加载现有数据
-                        existing_data = supabase.table('reagents').select('*').execute().data
-                        existing_df = pd.DataFrame(existing_data)
+                        st.subheader("预览将要导入的数据")
+                        preview_df = df_import[required_cols].copy()
+                        st.dataframe(preview_df.head())
                         
-                        # 构建现有数据的唯一键（用于比较）
-                        if not existing_df.empty:
-                            existing_df['unique_key'] = existing_df.apply(
-                                lambda x: f"{x.get('name','')}|{x.get('cas','')}|{x.get('location','')}|{x.get('total','')}|{x.get('unit','')}|{x.get('date','')}|{x.get('danger_level','')}|{x.get('storage_requirement','')}|{x.get('remark','')}",
-                                axis=1
-                            )
-                            existing_keys = set(existing_df['unique_key'].tolist())
-                        else:
-                            existing_keys = set()
-                        
-                        # 检查导入数据中哪些与已有数据完全一致
-                        duplicate_rows = []
-                        new_rows = []
-                        
-                        for idx, row in df_import.iterrows():
-                            # 构建导入行的唯一键
-                            name = str(row.get('名称', '')).strip()
-                            cas = str(row.get('CAS号', '')).strip()
-                            location = str(row.get('位置', '')).strip()
-                            total = str(row.get('总量', '')).strip()
-                            unit = str(row.get('单位', '')).strip()
-                            date = str(row.get('登入日期', '')).strip()
-                            danger = str(row.get('危险等级', '无')).strip()
-                            storage = str(row.get('存放要求', '无特殊要求')).strip()
-                            remark = str(row.get('备注', '')).strip()
-                            
-                            unique_key = f"{name}|{cas}|{location}|{total}|{unit}|{date}|{danger}|{storage}|{remark}"
-                            
-                            if unique_key in existing_keys:
-                                duplicate_rows.append((idx, row, unique_key))
-                            else:
-                                new_rows.append((idx, row, unique_key))
-                        
-                        # 显示检查结果
-                        if duplicate_rows:
-                            st.warning(f"⚠️ 发现 {len(duplicate_rows)} 条记录与已有数据完全一致")
-                            with st.expander("查看重复记录"):
-                                for idx, row, _ in duplicate_rows:
-                                    st.write(f"- 第{idx+2}行：{row.get('名称', '未知')}")
-                            
-                            # 重复记录处理方式
-                            duplicate_action = st.radio(
-                                "重复记录处理方式",
-                                ["跳过（不导入）", "覆盖（更新已有数据）"],
-                                horizontal=True,
-                                key="duplicate_action"
-                            )
-                        else:
-                            duplicate_action = "跳过（不导入）"
-                            st.success("✅ 未发现重复记录")
-                        
-                        # 显示将要导入的新记录
-                        if new_rows:
-                            st.info(f"📋 发现 {len(new_rows)} 条新记录")
-                            with st.expander("查看新记录"):
-                                for idx, row, _ in new_rows:
-                                    st.write(f"- 第{idx+2}行：{row.get('名称', '未知')}")
-                        else:
-                            st.info("📋 没有新记录需要导入")
-                        
-                        # 确认导入
                         if st.button("✅ 确认导入"):
                             success_count = 0
                             error_count = 0
-                            skip_count = 0
-                            update_count = 0
                             error_messages = []
                             
-                            # 先处理重复记录（覆盖）
-                            if duplicate_action == "覆盖（更新已有数据）":
-                                for idx, row, unique_key in duplicate_rows:
-                                    try:
-                                        # 找到对应的现有记录
-                                        matching_row = existing_df[existing_df['unique_key'] == unique_key].iloc[0]
-                                        record_id = matching_row['id']
-                                        
-                                        # 准备更新数据
-                                        name = str(row.get('名称', '')).strip()
-                                        location = str(row.get('位置', '')).strip()
-                                        
-                                        # 处理总量
-                                        total_str = str(row.get('总量', '')).strip()
-                                        import re
-                                        total_match = re.search(r'[\d.]+', total_str)
-                                        total_val = float(total_match.group()) if total_match else 0
-                                        
-                                        unit = str(row.get('单位', '')).strip()
-                                        cas_val = str(row.get('CAS号', '')).strip()
-                                        if cas_val == 'nan':
-                                            cas_val = ""
-                                        
-                                        date_str = str(row.get('登入日期', datetime.now().strftime("%Y-%m-%d")))[:10]
-                                        if date_str == 'nan':
-                                            date_str = datetime.now().strftime("%Y-%m-%d")
-                                        
-                                        danger_val = str(row.get('危险等级', '无')).strip()
-                                        if danger_val == 'nan' or danger_val not in DANGER_LEVELS:
-                                            danger_val = '无'
-                                        
-                                        storage_val = str(row.get('存放要求', '无特殊要求')).strip()
-                                        if storage_val == 'nan' or storage_val not in STORAGE_REQUIREMENTS:
-                                            storage_val = '无特殊要求'
-                                        
-                                        remark_val = str(row.get('备注', '')).strip()
-                                        if remark_val == 'nan':
-                                            remark_val = ""
-                                        
-                                        # 更新数据库
-                                        supabase.table('reagents').update({
-                                            'name': name,
-                                            'cas': cas_val,
-                                            'location': location,
-                                            'total': total_val,
-                                            'unit': unit,
-                                            'date': date_str,
-                                            'danger_level': danger_val,
-                                            'storage_requirement': storage_val,
-                                            'remark': remark_val
-                                        }).eq('id', record_id).execute()
-                                        update_count += 1
-                                        
-                                    except Exception as e:
-                                        error_count += 1
-                                        error_messages.append(f"更新第{idx+2}行 {row.get('名称', '未知')}: {str(e)[:50]}")
-                            
-                            else:
-                                # 跳过重复记录
-                                skip_count = len(duplicate_rows)
-                            
-                            # 处理新记录
-                            for idx, row, _ in new_rows:
+                            for idx, row in df_import.iterrows():
                                 try:
-                                    # ===== 必填字段 =====
                                     name = str(row.get('名称', '')).strip()
                                     if not name or name == 'nan':
                                         error_count += 1
@@ -958,7 +825,6 @@ elif menu == "👑 管理员模式":
                                         error_messages.append(f"第{idx+2}行：位置为空")
                                         continue
                                     
-                                    # 处理总量
                                     total_str = str(row.get('总量', '')).strip()
                                     if not total_str or total_str == 'nan':
                                         error_count += 1
@@ -980,14 +846,15 @@ elif menu == "👑 管理员模式":
                                         error_messages.append(f"第{idx+2}行：单位为空")
                                         continue
                                     
-                                    # 选填字段
                                     cas_val = str(row.get('CAS号', '')).strip()
                                     if cas_val == 'nan':
                                         cas_val = ""
                                     
-                                    date_str = str(row.get('登入日期', datetime.now().strftime("%Y-%m-%d")))[:10]
-                                    if date_str == 'nan':
+                                    date_str = row.get('登入日期', '')
+                                    if pd.isna(date_str) or str(date_str) == 'nan':
                                         date_str = datetime.now().strftime("%Y-%m-%d")
+                                    else:
+                                        date_str = str(date_str)[:10]
                                     
                                     danger_val = str(row.get('危险等级', '无')).strip()
                                     if danger_val == 'nan' or danger_val not in DANGER_LEVELS:
@@ -1001,7 +868,6 @@ elif menu == "👑 管理员模式":
                                     if remark_val == 'nan':
                                         remark_val = ""
                                     
-                                    # 插入数据库
                                     supabase.table('reagents').insert({
                                         'name': name,
                                         'cas': cas_val,
@@ -1019,23 +885,12 @@ elif menu == "👑 管理员模式":
                                     error_count += 1
                                     error_messages.append(f"第{idx+2}行 {row.get('名称', '未知')}: {str(e)[:50]}")
                             
-                            # 显示结果
-                            result_msg = f"✅ 导入完成！新增：{success_count} 条"
-                            if update_count > 0:
-                                result_msg += f"，更新：{update_count} 条"
-                            if skip_count > 0:
-                                result_msg += f"，跳过：{skip_count} 条"
-                            if error_count > 0:
-                                result_msg += f"，失败：{error_count} 条"
-                            
-                            st.success(result_msg)
-                            
+                            st.success(f"✅ 导入完成！成功：{success_count} 条，失败：{error_count} 条")
                             if error_messages:
                                 with st.expander("查看失败详情"):
                                     for msg in error_messages[:20]:
                                         st.write(f"- {msg}")
-                            
-                            if success_count > 0 or update_count > 0:
+                            if success_count > 0:
                                 st.rerun()
                 except Exception as e:
                     st.error(f"读取文件失败：{e}")
