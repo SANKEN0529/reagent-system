@@ -720,9 +720,9 @@ elif menu == "👑 管理员模式":
                 
                 st.divider()
                 
-      # 数据导入导出
+       # 数据导入导出
     elif admin_menu == "数据导入导出":
-        st.subheader("数据导入导出")
+        st.subheader("📊 数据导入导出")
         
         tab_export, tab_import = st.tabs(["📎 导出数据", "📂 导入数据"])
         
@@ -735,11 +735,14 @@ elif menu == "👑 管理员模式":
             if data:
                 st.info(f"共 {len(data)} 种试剂")
                 
-                # 导出为 Excel
+                # 导出为 Excel（不包含 ID）
                 df = pd.DataFrame(data)
-                export_cols = ['id', 'name', 'cas', 'location', 'total', 'unit', 'date', 'danger_level', 'storage_requirement', 'remark']
+                export_cols = ['name', 'cas', 'location', 'total', 'unit', 'date', 'danger_level', 'storage_requirement', 'remark']
                 df = df[export_cols]
-                df.columns = ['ID', '名称', 'CAS号', '位置', '总量', '单位', '登入日期', '危险等级', '存放要求', '备注']
+                df.columns = ['名称', 'CAS号', '位置', '总量', '单位', '登入日期', '危险等级', '存放要求', '备注']
+                
+                # 确保总量是整数格式
+                df['总量'] = df['总量'].apply(lambda x: int(x) if float(x).is_integer() else x)
                 
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -761,54 +764,144 @@ elif menu == "👑 管理员模式":
         # ========== 导入数据 ==========
         with tab_import:
             st.write("### 导入试剂清单")
-            st.info("📌 导入说明：\n- 请使用导出功能得到的 Excel 模板\n- 或按照以下列名准备文件：名称、CAS号、位置、总量、单位、登入日期、危险等级、存放要求、备注\n- 注意：ID列会自动生成，不需要填写")
+            st.info("📌 导入说明：\n"
+                    "- **必填列**：名称、位置、总量、单位\n"
+                    "- **选填列**：CAS号、登入日期、危险等级、存放要求、备注\n"
+                    "- 缺少选填列时会自动填入默认值\n"
+                    "- ID列会自动生成，不需要填写")
             
             uploaded_file = st.file_uploader("选择 Excel 文件", type=["xlsx", "xls"])
             
             if uploaded_file is not None:
                 try:
+                    # 读取 Excel
                     df_import = pd.read_excel(uploaded_file)
                     st.write(f"读取到 {len(df_import)} 条记录")
                     st.dataframe(df_import.head())
                     
-                    # 检查必要的列
-                    required_cols = ['名称', 'CAS号', '位置', '总量', '单位']
+                    # 检查必要的列（只有4个必填）
+                    required_cols = ['名称', '位置', '总量', '单位']
                     missing_cols = [col for col in required_cols if col not in df_import.columns]
                     
                     if missing_cols:
                         st.error(f"缺少必要的列：{', '.join(missing_cols)}")
+                        st.write("当前文件的列名：", list(df_import.columns))
                     else:
+                        # 显示将要导入的数据
+                        st.subheader("预览将要导入的数据")
+                        preview_df = df_import[required_cols].copy()
+                        preview_df.columns = ['名称', '位置', '总量', '单位']
+                        st.dataframe(preview_df.head())
+                        
                         # 确认导入
                         if st.button("✅ 确认导入"):
                             success_count = 0
                             error_count = 0
+                            error_messages = []
                             
-                            for _, row in df_import.iterrows():
+                            for idx, row in df_import.iterrows():
                                 try:
-                                    # 处理日期
+                                    # ===== 必填字段 =====
+                                    name = str(row['名称']).strip()
+                                    if not name:
+                                        error_count += 1
+                                        error_messages.append(f"第{idx+2}行：名称为空")
+                                        continue
+                                    
+                                    location = str(row['位置']).strip()
+                                    if not location:
+                                        error_count += 1
+                                        error_messages.append(f"第{idx+2}行：位置为空")
+                                        continue
+                                    
+                                    # 处理总量
+                                    total_val = row['总量']
+                                    if pd.isna(total_val):
+                                        error_count += 1
+                                        error_messages.append(f"第{idx+2}行：总量为空")
+                                        continue
+                                    try:
+                                        total_val = float(total_val)
+                                    except:
+                                        error_count += 1
+                                        error_messages.append(f"第{idx+2}行：总量格式错误")
+                                        continue
+                                    
+                                    unit = str(row['单位']).strip()
+                                    if not unit:
+                                        error_count += 1
+                                        error_messages.append(f"第{idx+2}行：单位为空")
+                                        continue
+                                    
+                                    # ===== 选填字段（带默认值）=====
+                                    # CAS号
+                                    cas_val = row.get('CAS号', '')
+                                    if pd.isna(cas_val):
+                                        cas_val = ""
+                                    else:
+                                        cas_val = str(cas_val).strip()
+                                    
+                                    # 登入日期
                                     date_val = row.get('登入日期')
                                     if pd.isna(date_val):
                                         date_str = datetime.now().strftime("%Y-%m-%d")
                                     else:
-                                        date_str = str(date_val)[:10]
+                                        try:
+                                            date_obj = pd.to_datetime(date_val)
+                                            date_str = date_obj.strftime("%Y-%m-%d")
+                                        except:
+                                            date_str = datetime.now().strftime("%Y-%m-%d")
                                     
+                                    # 危险等级
+                                    danger_val = row.get('危险等级', '无')
+                                    if pd.isna(danger_val):
+                                        danger_val = '无'
+                                    else:
+                                        danger_val = str(danger_val).strip()
+                                        if danger_val not in DANGER_LEVELS:
+                                            danger_val = '无'
+                                    
+                                    # 存放要求
+                                    storage_val = row.get('存放要求', '无特殊要求')
+                                    if pd.isna(storage_val):
+                                        storage_val = '无特殊要求'
+                                    else:
+                                        storage_val = str(storage_val).strip()
+                                        if storage_val not in STORAGE_REQUIREMENTS:
+                                            storage_val = '无特殊要求'
+                                    
+                                    # 备注
+                                    remark_val = row.get('备注', '')
+                                    if pd.isna(remark_val):
+                                        remark_val = ""
+                                    else:
+                                        remark_val = str(remark_val).strip()
+                                    
+                                    # 插入数据库
                                     supabase.table('reagents').insert({
-                                        'name': str(row['名称']),
-                                        'cas': str(row.get('CAS号', '')),
-                                        'location': str(row['位置']),
-                                        'total': float(row['总量']),
-                                        'unit': str(row['单位']),
+                                        'name': name,
+                                        'cas': cas_val,
+                                        'location': location,
+                                        'total': total_val,
+                                        'unit': unit,
                                         'date': date_str,
-                                        'danger_level': str(row.get('危险等级', '无')),
-                                        'storage_requirement': str(row.get('存放要求', '无特殊要求')),
-                                        'remark': str(row.get('备注', ''))
+                                        'danger_level': danger_val,
+                                        'storage_requirement': storage_val,
+                                        'remark': remark_val
                                     }).execute()
                                     success_count += 1
+                                    
                                 except Exception as e:
                                     error_count += 1
-                                    st.write(f"导入失败：{row.get('名称', '未知')} - {e}")
+                                    error_messages.append(f"第{idx+2}行 {row.get('名称', '未知')}: {str(e)[:50]}")
                             
                             st.success(f"✅ 导入完成！成功：{success_count} 条，失败：{error_count} 条")
-                            st.rerun()
+                            if error_messages:
+                                with st.expander("查看失败详情"):
+                                    for msg in error_messages[:20]:
+                                        st.write(f"- {msg}")
+                            if success_count > 0:
+                                st.rerun()
                 except Exception as e:
                     st.error(f"读取文件失败：{e}")
+                    st.write("请确保文件格式正确，或尝试用导出功能重新生成模板")
