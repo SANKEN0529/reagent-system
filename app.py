@@ -460,7 +460,7 @@ elif menu == "👑 管理员模式":
     
     st.success("✅ 已登录管理员模式")
     
-    admin_menu = st.radio("选择管理项目", ["LCMS 管理", "核磁管理", "购买预约管理"], horizontal=True)
+    admin_menu = st.radio("选择管理项目", ["LCMS 管理", "核磁管理", "购买预约管理", "数据导入导出"], horizontal=True)
     
     # LCMS 管理
     if admin_menu == "LCMS 管理":
@@ -710,23 +710,96 @@ elif menu == "👑 管理员模式":
                                 st.rerun()
                 
                 st.divider()
-
-# ============================================================
-# 6. 导出Excel
-# ============================================================
-elif menu == "📎 导出Excel":
-    st.header("📎 导出试剂清单")
-    data = supabase.table('reagents').select('*').execute().data
-    
-    if data:
-        st.info(f"共 {len(data)} 种试剂")
-        st.subheader("预览（前5条）")
-        st.dataframe(pd.DataFrame(data).head(5))
+                
+      # 数据导入导出
+    elif admin_menu == "📊 数据导入导出":
+        st.subheader("📊 数据导入导出")
         
-        excel_data = export_to_excel(data)
-        b64 = base64.b64encode(excel_data).decode()
-        href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="试剂清单_{datetime.now().strftime("%Y%m%d")}.xlsx">📥 点击下载Excel文件</a>'
-        st.markdown(href, unsafe_allow_html=True)
-        st.success("导出完成！")
-    else:
-        st.warning("暂无数据")
+        tab_export, tab_import = st.tabs(["📎 导出数据", "📂 导入数据"])
+        
+        # ========== 导出数据 ==========
+        with tab_export:
+            st.write("### 导出试剂清单")
+            
+            data = supabase.table('reagents').select('*').execute().data
+            
+            if data:
+                st.info(f"共 {len(data)} 种试剂")
+                
+                # 导出为 Excel
+                df = pd.DataFrame(data)
+                export_cols = ['id', 'name', 'cas', 'location', 'total', 'unit', 'date', 'danger_level', 'storage_requirement', 'remark']
+                df = df[export_cols]
+                df.columns = ['ID', '名称', 'CAS号', '位置', '总量', '单位', '登入日期', '危险等级', '存放要求', '备注']
+                
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df.to_excel(writer, index=False, sheet_name='试剂清单')
+                
+                excel_data = output.getvalue()
+                b64 = base64.b64encode(excel_data).decode()
+                href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="试剂清单_{datetime.now().strftime("%Y%m%d")}.xlsx">📥 点击下载Excel文件</a>'
+                st.markdown(href, unsafe_allow_html=True)
+                
+                st.success("导出完成！")
+                
+                # 预览
+                st.subheader("预览（前5条）")
+                st.dataframe(df.head(5))
+            else:
+                st.warning("暂无数据")
+        
+        # ========== 导入数据 ==========
+        with tab_import:
+            st.write("### 导入试剂清单")
+            st.info("📌 导入说明：\n- 请使用导出功能得到的 Excel 模板\n- 或按照以下列名准备文件：名称、CAS号、位置、总量、单位、登入日期、危险等级、存放要求、备注\n- 注意：ID列会自动生成，不需要填写")
+            
+            uploaded_file = st.file_uploader("选择 Excel 文件", type=["xlsx", "xls"])
+            
+            if uploaded_file is not None:
+                try:
+                    df_import = pd.read_excel(uploaded_file)
+                    st.write(f"读取到 {len(df_import)} 条记录")
+                    st.dataframe(df_import.head())
+                    
+                    # 检查必要的列
+                    required_cols = ['名称', 'CAS号', '位置', '总量', '单位']
+                    missing_cols = [col for col in required_cols if col not in df_import.columns]
+                    
+                    if missing_cols:
+                        st.error(f"缺少必要的列：{', '.join(missing_cols)}")
+                    else:
+                        # 确认导入
+                        if st.button("✅ 确认导入"):
+                            success_count = 0
+                            error_count = 0
+                            
+                            for _, row in df_import.iterrows():
+                                try:
+                                    # 处理日期
+                                    date_val = row.get('登入日期')
+                                    if pd.isna(date_val):
+                                        date_str = datetime.now().strftime("%Y-%m-%d")
+                                    else:
+                                        date_str = str(date_val)[:10]
+                                    
+                                    supabase.table('reagents').insert({
+                                        'name': str(row['名称']),
+                                        'cas': str(row.get('CAS号', '')),
+                                        'location': str(row['位置']),
+                                        'total': float(row['总量']),
+                                        'unit': str(row['单位']),
+                                        'date': date_str,
+                                        'danger_level': str(row.get('危险等级', '无')),
+                                        'storage_requirement': str(row.get('存放要求', '无特殊要求')),
+                                        'remark': str(row.get('备注', ''))
+                                    }).execute()
+                                    success_count += 1
+                                except Exception as e:
+                                    error_count += 1
+                                    st.write(f"导入失败：{row.get('名称', '未知')} - {e}")
+                            
+                            st.success(f"✅ 导入完成！成功：{success_count} 条，失败：{error_count} 条")
+                            st.rerun()
+                except Exception as e:
+                    st.error(f"读取文件失败：{e}")
