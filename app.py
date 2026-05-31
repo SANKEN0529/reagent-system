@@ -372,7 +372,7 @@ elif menu == "🛒 购买预约":
                 else:
                     st.error("请填写申请人和试剂名称")
     
-        with tab2:
+           with tab2:
         st.subheader("📋 购买记录")
         
         # 筛选状态
@@ -410,7 +410,6 @@ elif menu == "🛒 购买预约":
                     if req.get('notes'):
                         st.caption(f"备注: {req['notes']}")
                 
-                # 显示状态
                 with col2:
                     status = req.get('purchase_status', '无')
                     if status == "无":
@@ -418,7 +417,6 @@ elif menu == "🛒 购买预约":
                     elif status == "已购买":
                         st.markdown("🟢 **状态: 已购买**")
                 
-                # 删除按钮（带二次确认）
                 with col3:
                     if f'user_delete_confirm_{req["id"]}' not in st.session_state:
                         st.session_state[f'user_delete_confirm_{req["id"]}'] = False
