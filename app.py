@@ -712,8 +712,8 @@ elif menu == "👑 管理员模式":
                 st.divider()
                 
       # 数据导入导出
-    elif admin_menu == "📊 数据导入导出":
-        st.subheader("📊 数据导入导出")
+    elif admin_menu == "数据导入导出":
+        st.subheader("数据导入导出")
         
         tab_export, tab_import = st.tabs(["📎 导出数据", "📂 导入数据"])
         
