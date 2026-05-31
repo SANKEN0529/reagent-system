@@ -757,7 +757,7 @@ elif menu == "👑 管理员模式":
             else:
                 st.warning("暂无数据")
         
-        # ========== 导入数据 ==========
+              # ========== 导入数据 ==========
         with tab_import:
             st.write("### 导入试剂清单")
             st.info("📌 导入说明：\n"
@@ -792,7 +792,9 @@ elif menu == "👑 管理员模式":
             if uploaded_file is not None:
                 try:
                     df_import = pd.read_excel(uploaded_file, dtype=str)
-                    st.write(f"读取到 {len(df_import)} 条记录")
+                    
+                    # 改为预览将要导入的数据
+                    st.subheader("📋 预览将要导入的数据")
                     st.dataframe(df_import.head())
                     
                     required_cols = ['名称', '位置', '总量', '单位']
@@ -802,10 +804,6 @@ elif menu == "👑 管理员模式":
                         st.error(f"缺少必要的列：{', '.join(missing_cols)}")
                         st.write("当前文件的列名：", list(df_import.columns))
                     else:
-                        st.subheader("预览将要导入的数据")
-                        preview_df = df_import[required_cols].copy()
-                        st.dataframe(preview_df.head())
-                        
                         if st.button("✅ 确认导入"):
                             success_count = 0
                             error_count = 0
