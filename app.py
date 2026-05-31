@@ -372,11 +372,13 @@ elif menu == "🛒 购买预约":
                 else:
                     st.error("请填写申请人和试剂名称")
     
-    with tab2:
+        with tab2:
         st.subheader("📋 购买记录")
         
+        # 筛选状态
         filter_status = st.radio("筛选状态", ["全部", "无", "已购买"], horizontal=True)
         
+        # 加载数据
         if filter_status == "全部":
             requests = supabase.table('purchase_requests').select('*').order('requested_at', desc=True).execute().data
         else:
@@ -385,38 +387,61 @@ elif menu == "🛒 购买预约":
         if not requests:
             st.info("暂无记录")
         else:
-            st.caption(f"共 {len(requests)} 条")
+            st.caption(f"共 {len(requests)} 条记录")
             
             for req in requests:
-                with st.container():
-                    col1, col2 = st.columns([4, 1])
+                col1, col2, col3 = st.columns([4, 1, 1])
+                
+                with col1:
+                    st.write(f"**{req['reagent_name']}**")
+                    details = []
+                    if req.get('cas'):
+                        details.append(f"CAS: {req['cas']}")
+                    if req.get('specification'):
+                        details.append(f"规格: {req['specification']}")
+                    if req.get('supplier'):
+                        details.append(f"商家: {req['supplier']}")
+                    if req.get('product_number'):
+                        details.append(f"货号: {req['product_number']}")
+                    if req.get('price'):
+                        details.append(f"¥{req['price']}")
+                    st.caption(" | ".join(details))
+                    st.caption(f"申请人: {req['requester']} | 时间: {req['requested_at'][:16]}")
+                    if req.get('notes'):
+                        st.caption(f"备注: {req['notes']}")
+                
+                # 显示状态
+                with col2:
+                    status = req.get('purchase_status', '无')
+                    if status == "无":
+                        st.markdown("🟡 **状态: 无**")
+                    elif status == "已购买":
+                        st.markdown("🟢 **状态: 已购买**")
+                
+                # 删除按钮（带二次确认）
+                with col3:
+                    if f'user_delete_confirm_{req["id"]}' not in st.session_state:
+                        st.session_state[f'user_delete_confirm_{req["id"]}'] = False
                     
-                    with col1:
-                        st.write(f"**{req['reagent_name']}**")
-                        details = []
-                        if req.get('cas'):
-                            details.append(f"CAS: {req['cas']}")
-                        if req.get('specification'):
-                            details.append(f"规格: {req['specification']}")
-                        if req.get('supplier'):
-                            details.append(f"商家: {req['supplier']}")
-                        if req.get('product_number'):
-                            details.append(f"货号: {req['product_number']}")
-                        if req.get('price'):
-                            details.append(f"¥{req['price']}")
-                        st.caption(" | ".join(details))
-                        st.caption(f"申请人: {req['requester']} | 时间: {req['requested_at'][:16]}")
-                        if req.get('notes'):
-                            st.caption(f"备注: {req['notes']}")
-                    
-                    with col2:
-                        status = req.get('purchase_status', '无')
-                        if status == "无":
-                            st.markdown("🟡 **状态: 无**")
-                        elif status == "已购买":
-                            st.markdown("🟢 **状态: 已购买**")
-                    
-                    st.divider()
+                    if not st.session_state[f'user_delete_confirm_{req["id"]}']:
+                        if st.button(f"🗑️ 删除", key=f"user_del_{req['id']}"):
+                            st.session_state[f'user_delete_confirm_{req["id"]}'] = True
+                            st.rerun()
+                    else:
+                        st.warning(f"确认删除 {req['reagent_name']}？")
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            if st.button(f"✅ 确认", key=f"user_del_yes_{req['id']}"):
+                                supabase.table('purchase_requests').delete().eq('id', req['id']).execute()
+                                st.session_state[f'user_delete_confirm_{req["id"]}'] = False
+                                st.success(f"🗑️ 已删除 {req['reagent_name']}")
+                                st.rerun()
+                        with col_b:
+                            if st.button(f"❌ 取消", key=f"user_del_no_{req['id']}"):
+                                st.session_state[f'user_delete_confirm_{req["id"]}'] = False
+                                st.rerun()
+                
+                st.divider()
 
 # ============================================================
 # 5. 管理员模式
