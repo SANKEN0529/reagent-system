@@ -761,21 +761,44 @@ elif menu == "👑 管理员模式":
             else:
                 st.warning("暂无数据")
         
-        # ========== 导入数据 ==========
+                # ========== 导入数据 ==========
         with tab_import:
             st.write("### 导入试剂清单")
             st.info("📌 导入说明：\n"
                     "- **必填列**：名称、位置、总量、单位\n"
                     "- **选填列**：CAS号、登入日期、危险等级、存放要求、备注\n"
                     "- 缺少选填列时会自动填入默认值\n"
-                    "- ID列会自动生成，不需要填写")
+                    "- 请使用「导出数据」功能生成的模板文件\n"
+                    "- 如果导入失败，请先用导出功能生成新模板")
+            
+            # 提供模板下载
+            if st.button("📥 下载导入模板"):
+                # 创建空模板
+                template_df = pd.DataFrame({
+                    '名称': ['示例试剂'],
+                    'CAS号': ['64-17-5'],
+                    '位置': ['A柜-1层'],
+                    '总量': [5000],
+                    '单位': ['ml'],
+                    '登入日期': [datetime.now().strftime("%Y-%m-%d")],
+                    '危险等级': ['无'],
+                    '存放要求': ['无特殊要求'],
+                    '备注': ['这是示例']
+                })
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    template_df.to_excel(writer, index=False, sheet_name='模板')
+                template_data = output.getvalue()
+                b64 = base64.b64encode(template_data).decode()
+                href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="导入模板.xlsx">📥 点击下载导入模板</a>'
+                st.markdown(href, unsafe_allow_html=True)
             
             uploaded_file = st.file_uploader("选择 Excel 文件", type=["xlsx", "xls"])
             
             if uploaded_file is not None:
                 try:
-                    # 读取 Excel
-                    df_import = pd.read_excel(uploaded_file)
+                    # 关键修复：强制以字符串类型读取所有列
+                    df_import = pd.read_excel(uploaded_file, dtype=str)
                     st.write(f"读取到 {len(df_import)} 条记录")
                     st.dataframe(df_import.head())
                     
@@ -790,7 +813,6 @@ elif menu == "👑 管理员模式":
                         # 显示将要导入的数据
                         st.subheader("预览将要导入的数据")
                         preview_df = df_import[required_cols].copy()
-                        preview_df.columns = ['名称', '位置', '总量', '单位']
                         st.dataframe(preview_df.head())
                         
                         # 确认导入
@@ -802,80 +824,68 @@ elif menu == "👑 管理员模式":
                             for idx, row in df_import.iterrows():
                                 try:
                                     # ===== 必填字段 =====
-                                    name = str(row['名称']).strip()
-                                    if not name:
+                                    name = str(row.get('名称', '')).strip()
+                                    if not name or name == 'nan':
                                         error_count += 1
                                         error_messages.append(f"第{idx+2}行：名称为空")
                                         continue
                                     
-                                    location = str(row['位置']).strip()
-                                    if not location:
+                                    location = str(row.get('位置', '')).strip()
+                                    if not location or location == 'nan':
                                         error_count += 1
                                         error_messages.append(f"第{idx+2}行：位置为空")
                                         continue
                                     
-                                    # 处理总量
-                                    total_val = row['总量']
-                                    if pd.isna(total_val):
+                                    # 处理总量（去除可能的中文字符）
+                                    total_str = str(row.get('总量', '')).strip()
+                                    if not total_str or total_str == 'nan':
                                         error_count += 1
                                         error_messages.append(f"第{idx+2}行：总量为空")
                                         continue
-                                    try:
-                                        total_val = float(total_val)
-                                    except:
+                                    
+                                    # 提取数字
+                                    import re
+                                    total_match = re.search(r'[\d.]+', total_str)
+                                    if total_match:
+                                        total_val = float(total_match.group())
+                                    else:
                                         error_count += 1
-                                        error_messages.append(f"第{idx+2}行：总量格式错误")
+                                        error_messages.append(f"第{idx+2}行：总量格式错误（应为数字）")
                                         continue
                                     
-                                    unit = str(row['单位']).strip()
-                                    if not unit:
+                                    unit = str(row.get('单位', '')).strip()
+                                    if not unit or unit == 'nan':
                                         error_count += 1
                                         error_messages.append(f"第{idx+2}行：单位为空")
                                         continue
                                     
-                                    # ===== 选填字段（带默认值）=====
+                                    # ===== 选填字段 =====
                                     # CAS号
-                                    cas_val = row.get('CAS号', '')
-                                    if pd.isna(cas_val):
+                                    cas_val = str(row.get('CAS号', '')).strip()
+                                    if cas_val == 'nan':
                                         cas_val = ""
-                                    else:
-                                        cas_val = str(cas_val).strip()
                                     
                                     # 登入日期
-                                    date_val = row.get('登入日期')
-                                    if pd.isna(date_val):
+                                    date_str = row.get('登入日期', '')
+                                    if pd.isna(date_str) or str(date_str) == 'nan':
                                         date_str = datetime.now().strftime("%Y-%m-%d")
                                     else:
-                                        try:
-                                            date_obj = pd.to_datetime(date_val)
-                                            date_str = date_obj.strftime("%Y-%m-%d")
-                                        except:
-                                            date_str = datetime.now().strftime("%Y-%m-%d")
+                                        date_str = str(date_str)[:10]
                                     
                                     # 危险等级
-                                    danger_val = row.get('危险等级', '无')
-                                    if pd.isna(danger_val):
+                                    danger_val = str(row.get('危险等级', '无')).strip()
+                                    if danger_val == 'nan' or danger_val not in DANGER_LEVELS:
                                         danger_val = '无'
-                                    else:
-                                        danger_val = str(danger_val).strip()
-                                        if danger_val not in DANGER_LEVELS:
-                                            danger_val = '无'
                                     
                                     # 存放要求
-                                    storage_val = row.get('存放要求', '无特殊要求')
-                                    if pd.isna(storage_val):
+                                    storage_val = str(row.get('存放要求', '无特殊要求')).strip()
+                                    if storage_val == 'nan' or storage_val not in STORAGE_REQUIREMENTS:
                                         storage_val = '无特殊要求'
-                                    else:
-                                        storage_val = str(storage_val).strip()
-                                        if storage_val not in STORAGE_REQUIREMENTS:
-                                            storage_val = '无特殊要求'
                                     
                                     # 备注
-                                    remark_val = row.get('备注', '')
-                                    if pd.isna(remark_val):
+                                    remark_val = str(row.get('备注', '')).strip()
+                                    if remark_val == 'nan':
                                         remark_val = ""
-                                    else:
-                                        remark_val = str(remark_val).strip()
                                     
                                     # 插入数据库
                                     supabase.table('reagents').insert({
@@ -904,4 +914,4 @@ elif menu == "👑 管理员模式":
                                 st.rerun()
                 except Exception as e:
                     st.error(f"读取文件失败：{e}")
-                    st.write("请确保文件格式正确，或尝试用导出功能重新生成模板")
+                    st.write("请点击「下载导入模板」按钮，使用生成的模板文件填写数据")
