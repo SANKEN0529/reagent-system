@@ -1,0 +1,41 @@
+name: Keep Streamlit Awake
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # 每6小时执行一次
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install Playwright
+        run: |
+          pip install playwright
+          playwright install chromium --with-deps
+      
+      - name: Wake up the app
+        run: |
+          python -c "
+          from playwright.sync_api import sync_playwright
+          
+          with sync_playwright() as p:
+              browser = p.chromium.launch(headless=True)
+              page = browser.new_page()
+              page.goto('https://dxqlab-reagent.streamlit.app')
+              
+              # 如果看到唤醒按钮，就点击它
+              wake_btn = page.get_by_text('Yes, get this app back up')
+              if wake_btn.count() > 0:
+                  wake_btn.click()
+                  print('✅ App woke up')
+              else:
+                  print('✅ App already awake')
+              
+              browser.close()
+          "
