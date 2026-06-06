@@ -36,6 +36,7 @@ jobs:
                   print('✅ App woke up')
               else:
                   print('✅ App already awake')
-              
+
+              page.wait_for_timeout(30000)
               browser.close()
           "
