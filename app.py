@@ -49,7 +49,7 @@ if menu == "📋 试剂管理":
     
     # 初始化 session_state
     if 'reagent_menu' not in st.session_state:
-    st.session_state.reagent_menu = "查看所有"
+        st.session_state.reagent_menu = "查看所有"
             
     reagent_menu = st.radio("选择操作", ["查看所有", "添加试剂", "搜索试剂", "编辑/删除"], horizontal=True)
     
