@@ -50,7 +50,7 @@ if menu == "📋 试剂管理":
     
     # 查看所有（已隐藏ID）
     if reagent_menu == "查看所有":
-        supabase.table('reagents').select('*').order('id', desc=True).execute().data
+        data = supabase.table('reagents').select('*').order('id', desc=True).execute().data
         if data:
             df = pd.DataFrame(data)
             display_cols = ['name', 'cas', 'location', 'total', 'unit', 'date', 'danger_level', 'storage_requirement', 'remark']
