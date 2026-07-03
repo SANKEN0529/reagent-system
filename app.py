@@ -45,12 +45,7 @@ def export_to_excel(data):
 # 1. 试剂管理
 # ============================================================
 if menu == "📋 试剂管理":
-    st.header("📋 试剂管理")
-    
-    # 初始化 session_state
-    if 'reagent_menu' not in st.session_state:
-        st.session_state.reagent_menu = "查看所有"
-            
+    st.header("📋 试剂管理")     
     reagent_menu = st.radio("选择操作", ["查看所有", "添加试剂", "搜索试剂", "编辑/删除"], horizontal=True)
     
     # 查看所有（已隐藏ID）
@@ -105,9 +100,6 @@ if menu == "📋 试剂管理":
                     }).execute()
                     st.success(f"✅ 已添加 {name}")
                     st.balloons() 
-                    # 跳转到查看所有界面
-                    st.session_state.reagent_menu = "查看所有"
-                    st.rerun()
                 else:
                     st.error("请填写完整信息") 
     
