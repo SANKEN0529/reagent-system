@@ -76,24 +76,20 @@ if menu == "📋 试剂管理":
             st.info("暂无数据")
     
     elif reagent_menu == "添加试剂":
-        # 初始化 session_state
-        if 'add_form_reset' not in st.session_state:
-            st.session_state.add_form_reset = False
-        
         with st.form("add_form"):
             col1, col2, col3 = st.columns(3)
             with col1:
-                name = st.text_input("试剂名称 *")
-                cas = st.text_input("CAS号 *", placeholder="例如：64-17-5")
-                location = st.text_input("存放位置 *")
+                name = st.text_input("试剂名称 *", key="add_name")
+                cas = st.text_input("CAS号 *", placeholder="例如：64-17-5", key="add_cas")
+                location = st.text_input("存放位置 *", key="add_location")
             with col2:
-                total = st.number_input("总量 *", min_value=0, step=1, format="%d")
-                unit = st.text_input("单位 *", placeholder="例如：g, ml, 瓶, 支")
-                date = st.date_input("登入日期", datetime.now())
+                total = st.number_input("总量 *", min_value=0, step=1, format="%d", key="add_total")
+                unit = st.text_input("单位 *", placeholder="例如：g, ml, 瓶, 支", key="add_unit")
+                date = st.date_input("登入日期", datetime.now(), key="add_date")
             with col3:
-                danger_level = st.selectbox("危险等级", DANGER_LEVELS)
-                storage_requirement = st.selectbox("存放要求", STORAGE_REQUIREMENTS)
-            remark = st.text_area("备注", placeholder="纯度、厂家、注意事项等")
+                danger_level = st.selectbox("危险等级", DANGER_LEVELS, key="add_danger")
+                storage_requirement = st.selectbox("存放要求", STORAGE_REQUIREMENTS, key="add_storage")
+            remark = st.text_area("备注", placeholder="纯度、厂家、注意事项等", key="add_remark")
             
             submitted = st.form_submit_button("✅ 添加")
             
@@ -107,15 +103,14 @@ if menu == "📋 试剂管理":
                     }).execute()
                     st.success(f"✅ 已添加 {name}")
                     st.balloons()
-                    # 设置标志，触发重置
-                    st.session_state.add_form_reset = True
+                    # 清空所有输入框
+                    for key in ['add_name', 'add_cas', 'add_location', 'add_unit', 'add_remark']:
+                        if key in st.session_state:
+                            st.session_state[key] = ""
+                    st.session_state['add_total'] = 0
                     st.rerun()
                 else:
                     st.error("请填写完整信息（名称、CAS号、位置、单位、总量）")
-        
-        # 如果添加成功，清除标志
-        if st.session_state.add_form_reset:
-            st.session_state.add_form_reset = False
     
     # 搜索试剂（已隐藏ID）
     elif reagent_menu == "搜索试剂":
