@@ -75,46 +75,35 @@ if menu == "📋 试剂管理":
         else:
             st.info("暂无数据")
     
-    elif reagent_menu == "添加试剂":
-        # 初始化添加状态
-        if 'add_success' not in st.session_state:
-            st.session_state.add_success = False
+elif reagent_menu == "添加试剂":
+    with st.form("add_form"):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            name = st.text_input("试剂名称 *")
+            cas = st.text_input("CAS号 *", placeholder="例如：64-17-5")
+            location = st.text_input("存放位置 *")
+        with col2:
+            total = st.number_input("总量 *", min_value=0, step=1, format="%d")
+            unit = st.text_input("单位 *", placeholder="例如：g, ml, 瓶, 支")
+            date = st.date_input("登入日期", datetime.now())
+        with col3:
+            danger_level = st.selectbox("危险等级", DANGER_LEVELS)
+            storage_requirement = st.selectbox("存放要求", STORAGE_REQUIREMENTS)
+        remark = st.text_area("备注", placeholder="纯度、厂家、注意事项等")
         
-        with st.form("add_form"):
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                name = st.text_input("试剂名称 *", value="" if st.session_state.add_success else None)
-                cas = st.text_input("CAS号 *", placeholder="例如：64-17-5", value="" if st.session_state.add_success else None)
-                location = st.text_input("存放位置 *", value="" if st.session_state.add_success else None)
-            with col2:
-                total = st.number_input("总量 *", min_value=0, step=1, format="%d", value=0 if st.session_state.add_success else None)
-                unit = st.text_input("单位 *", placeholder="例如：g, ml, 瓶, 支", value="" if st.session_state.add_success else None)
-                date = st.date_input("登入日期", datetime.now())
-            with col3:
-                danger_level = st.selectbox("危险等级", DANGER_LEVELS)
-                storage_requirement = st.selectbox("存放要求", STORAGE_REQUIREMENTS)
-            remark = st.text_area("备注", placeholder="纯度、厂家、注意事项等", value="" if st.session_state.add_success else None)
-            
-            if st.form_submit_button("✅ 添加"):
-                if name and cas and location and unit and total > 0:
-                    supabase.table('reagents').insert({
-                        'name': name, 'cas': cas, 'location': location,
-                        'total': total, 'unit': unit, 'date': str(date),
-                        'danger_level': danger_level, 'storage_requirement': storage_requirement,
-                        'remark': remark
-                    }).execute()
-                    st.success(f"✅ 已添加 {name}")
-                    st.balloons()
-                    # 标记成功，刷新页面清空输入
-                    st.session_state.add_success = True
-                    st.rerun()
-                else:
-                    st.error("请填写完整信息（名称、CAS号、位置、单位、总量）")
-                    st.session_state.add_success = False
-        
-        # 重置成功标志（页面刷新后清除）
-        if st.session_state.add_success:
-            st.session_state.add_success = False
+        if st.form_submit_button("✅ 添加"):
+            if name and cas and location and unit and total > 0:
+                supabase.table('reagents').insert({
+                    'name': name, 'cas': cas, 'location': location,
+                    'total': total, 'unit': unit, 'date': str(date),
+                    'danger_level': danger_level, 'storage_requirement': storage_requirement,
+                    'remark': remark
+                }).execute()
+                st.success(f"✅ 已添加 {name}")
+                st.balloons()
+                st.rerun()  # ← 只加了这一行
+            else:
+                st.error("请填写完整信息")
     
     # 搜索试剂（已隐藏ID）
     elif reagent_menu == "搜索试剂":
