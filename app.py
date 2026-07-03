@@ -101,9 +101,9 @@ if menu == "📋 试剂管理":
                     }).execute()
                     st.success(f"✅ 已添加 {name}")
                     st.balloons()
-                    st.rerun()  # ← 只加了这一行
+                    st.rerun()
                 else:
-                    st.error("请填写完整信息")
+                    st.error("请填写完整信息") 
     
     # 搜索试剂（已隐藏ID）
     elif reagent_menu == "搜索试剂":
