@@ -83,7 +83,7 @@ if menu == "📋 试剂管理":
                 cas = st.text_input("CAS号 *", placeholder="例如：64-17-5")
                 location = st.text_input("存放位置 *")
             with col2:
-                total = st.number_input("总量 *", min_value=0, step=1, format="%d", value=0)
+                total = st.number_input("总量 *", min_value=0, step=1, format="%d")
                 unit = st.text_input("单位 *", placeholder="例如：g, ml, 瓶, 支")
                 date = st.date_input("登入日期", datetime.now())
             with col3:
@@ -91,9 +91,7 @@ if menu == "📋 试剂管理":
                 storage_requirement = st.selectbox("存放要求", STORAGE_REQUIREMENTS)
             remark = st.text_area("备注", placeholder="纯度、厂家、注意事项等")
             
-            submitted = st.form_submit_button("✅ 添加")
-            
-            if submitted:
+            if st.form_submit_button("✅ 添加"):
                 if name and cas and location and unit and total > 0:
                     supabase.table('reagents').insert({
                         'name': name, 'cas': cas, 'location': location,
@@ -103,9 +101,9 @@ if menu == "📋 试剂管理":
                     }).execute()
                     st.success(f"✅ 已添加 {name}")
                     st.balloons()
-                    st.rerun()
+                    st.rerun()  # ← 就加这一行，刷新页面清空输入
                 else:
-                    st.error("请填写完整信息（名称、CAS号、位置、单位、总量）")
+                    st.error("请填写完整信息")
     
     # 搜索试剂（已隐藏ID）
     elif reagent_menu == "搜索试剂":
