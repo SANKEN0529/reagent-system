@@ -101,7 +101,9 @@ if menu == "📋 试剂管理":
                     }).execute()
                     st.success(f"✅ 已添加 {name}")
                     st.balloons()
-                    st.rerun()  # 刷新页面，回到空输入
+                    # 跳转到查看所有界面
+                    st.session_state.reagent_action = "查看所有"
+                    st.rerun()
                 else:
                     st.error("请填写完整信息（名称、CAS号、位置、单位、总量）")
     
