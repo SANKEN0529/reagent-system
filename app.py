@@ -79,21 +79,19 @@ if menu == "📋 试剂管理":
         with st.form("add_form"):
             col1, col2, col3 = st.columns(3)
             with col1:
-                name = st.text_input("试剂名称 *", key="add_name")
-                cas = st.text_input("CAS号 *", placeholder="例如：64-17-5", key="add_cas")
-                location = st.text_input("存放位置 *", key="add_location")
+                name = st.text_input("试剂名称 *")
+                cas = st.text_input("CAS号 *", placeholder="例如：64-17-5")
+                location = st.text_input("存放位置 *")
             with col2:
-                total = st.number_input("总量 *", min_value=0, step=1, format="%d", key="add_total")
-                unit = st.text_input("单位 *", placeholder="例如：g, ml, 瓶, 支", key="add_unit")
-                date = st.date_input("登入日期", datetime.now(), key="add_date")
+                total = st.number_input("总量 *", min_value=0, step=1, format="%d")
+                unit = st.text_input("单位 *", placeholder="例如：g, ml, 瓶, 支")
+                date = st.date_input("登入日期", datetime.now())
             with col3:
-                danger_level = st.selectbox("危险等级", DANGER_LEVELS, key="add_danger")
-                storage_requirement = st.selectbox("存放要求", STORAGE_REQUIREMENTS, key="add_storage")
-            remark = st.text_area("备注", placeholder="纯度、厂家、注意事项等", key="add_remark")
+                danger_level = st.selectbox("危险等级", DANGER_LEVELS)
+                storage_requirement = st.selectbox("存放要求", STORAGE_REQUIREMENTS)
+            remark = st.text_area("备注", placeholder="纯度、厂家、注意事项等")
             
-            submitted = st.form_submit_button("✅ 添加")
-            
-            if submitted:
+            if st.form_submit_button("✅ 添加"):
                 if name and cas and location and unit and total > 0:
                     supabase.table('reagents').insert({
                         'name': name, 'cas': cas, 'location': location,
@@ -103,12 +101,7 @@ if menu == "📋 试剂管理":
                     }).execute()
                     st.success(f"✅ 已添加 {name}")
                     st.balloons()
-                    # 清空所有输入框
-                    for key in ['add_name', 'add_cas', 'add_location', 'add_unit', 'add_remark']:
-                        if key in st.session_state:
-                            st.session_state[key] = ""
-                    st.session_state['add_total'] = 0
-                    st.rerun()
+                    st.rerun()  # 刷新页面，回到空输入
                 else:
                     st.error("请填写完整信息（名称、CAS号、位置、单位、总量）")
     
