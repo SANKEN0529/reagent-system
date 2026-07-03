@@ -101,9 +101,6 @@ if menu == "📋 试剂管理":
                     }).execute()
                     st.success(f"✅ 已添加 {name}")
                     st.balloons() 
-                     # 切换到查看所有
-                    st.session_state.reagent_menu = "查看所有"
-                    st.rerun()
                 else:
                     st.error("请填写完整信息") 
     
