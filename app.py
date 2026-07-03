@@ -76,6 +76,10 @@ if menu == "📋 试剂管理":
             st.info("暂无数据")
     
     elif reagent_menu == "添加试剂":
+        # 初始化 session_state
+        if 'add_form_reset' not in st.session_state:
+            st.session_state.add_form_reset = False
+        
         with st.form("add_form"):
             col1, col2, col3 = st.columns(3)
             with col1:
@@ -91,7 +95,9 @@ if menu == "📋 试剂管理":
                 storage_requirement = st.selectbox("存放要求", STORAGE_REQUIREMENTS)
             remark = st.text_area("备注", placeholder="纯度、厂家、注意事项等")
             
-            if st.form_submit_button("✅ 添加"):
+            submitted = st.form_submit_button("✅ 添加")
+            
+            if submitted:
                 if name and cas and location and unit and total > 0:
                     supabase.table('reagents').insert({
                         'name': name, 'cas': cas, 'location': location,
@@ -101,9 +107,15 @@ if menu == "📋 试剂管理":
                     }).execute()
                     st.success(f"✅ 已添加 {name}")
                     st.balloons()
-                    st.rerun()  # ← 就加这一行，刷新页面清空输入
+                    # 设置标志，触发重置
+                    st.session_state.add_form_reset = True
+                    st.rerun()
                 else:
-                    st.error("请填写完整信息")
+                    st.error("请填写完整信息（名称、CAS号、位置、单位、总量）")
+        
+        # 如果添加成功，清除标志
+        if st.session_state.add_form_reset:
+            st.session_state.add_form_reset = False
     
     # 搜索试剂（已隐藏ID）
     elif reagent_menu == "搜索试剂":
