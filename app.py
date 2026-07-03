@@ -75,7 +75,7 @@ if menu == "📋 试剂管理":
         else:
             st.info("暂无数据")
     
-       elif reagent_menu == "添加试剂":
+    elif reagent_menu == "添加试剂":
         with st.form("add_form"):
             col1, col2, col3 = st.columns(3)
             with col1:
