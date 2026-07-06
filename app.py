@@ -171,6 +171,8 @@ if menu == "📋 试剂管理":
                             'remark': new_remark
                         }).eq('id', r['id']).execute()
                         st.success("✅ 已保存")
+                        st.balloons()
+                        time.sleep(1.5)
                         st.rerun()
                 
                 st.markdown("---")
