@@ -112,7 +112,7 @@ if menu == "📋 试剂管理":
             if search_type == "按名称":
                 data = supabase.table('reagents').select('*').ilike('name', f'%{keyword}%').execute().data
             elif search_type == "按CAS号":
-                data = supabase.table('reagents').select('*').ilike('cas', f'%{keyword}%').execute().data
+                data = supabase.table('reagents').select('*').eq('cas', keyword).execute().data
             elif search_type == "按位置":
                 data = supabase.table('reagents').select('*').ilike('location', f'%{keyword}%').execute().data
             else:
